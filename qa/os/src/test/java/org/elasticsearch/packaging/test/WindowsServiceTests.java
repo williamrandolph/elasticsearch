@@ -48,7 +48,7 @@ public class WindowsServiceTests extends PackagingTestCase {
 
     @BeforeClass
     public static void ensureWindows() {
-        assumeTrue(Platforms.WINDOWS);
+        assumeTrue(Platforms.OS.current() == Platforms.OS.WINDOWS);
         assumeTrue(distribution().hasJdk);
     }
 

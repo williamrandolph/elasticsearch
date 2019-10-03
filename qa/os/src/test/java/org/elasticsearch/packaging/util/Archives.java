@@ -41,7 +41,6 @@ import static org.elasticsearch.packaging.util.FileUtils.getDistributionFile;
 import static org.elasticsearch.packaging.util.FileUtils.lsGlob;
 import static org.elasticsearch.packaging.util.FileUtils.mv;
 import static org.elasticsearch.packaging.util.FileUtils.slurp;
-import static org.elasticsearch.packaging.util.Platforms.isDPKG;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
@@ -58,7 +57,7 @@ public class Archives {
     private static final Log logger = LogFactory.getLog(Archives.class);
 
     // in the future we'll run as a role user on Windows
-    public static final String ARCHIVE_OWNER = Platforms.WINDOWS
+    public static final String ARCHIVE_OWNER = Platforms.OS.current() == Platforms.OS.WINDOWS
         ? "vagrant"
         : "elasticsearch";
 
@@ -79,13 +78,13 @@ public class Archives {
         logger.info("Installing file: " + distributionFile);
         final String installCommand;
         if (distribution.packaging == Distribution.Packaging.TAR) {
-            if (Platforms.WINDOWS) {
+            if (Platforms.OS.current() == Platforms.OS.WINDOWS) {
                 throw new IllegalStateException("Distribution " + distribution + " is not supported on windows");
             }
             installCommand = "tar -C " + baseInstallPath + " -xzpf " + distributionFile;
 
         } else if (distribution.packaging == Distribution.Packaging.ZIP) {
-            if (Platforms.WINDOWS == false) {
+            if (Platforms.OS.current() != Platforms.OS.WINDOWS) {
                 throw new IllegalStateException("Distribution " + distribution + " is not supported on linux");
             }
             installCommand =
@@ -106,8 +105,11 @@ public class Archives {
         assertThat("only the intended installation exists", installations, hasSize(1));
         assertThat("only the intended installation exists", installations.get(0), is(fullInstallPath));
 
-        Platforms.onLinux(() -> setupArchiveUsersLinux(fullInstallPath));
-        Platforms.onWindows(() -> setupArchiveUsersWindows(fullInstallPath));
+        Platforms.OsConditional.conditional()
+            .onLinux(() -> setupArchiveUsersLinux(fullInstallPath))
+            .onWindows(() -> setupArchiveUsersWindows(fullInstallPath))
+            .noDarwinTest()
+            .run();
 
         return Installation.ofArchive(fullInstallPath);
     }
@@ -116,7 +118,7 @@ public class Archives {
         final Shell sh = new Shell();
 
         if (sh.runIgnoreExitCode("getent group elasticsearch").isSuccess() == false) {
-            if (isDPKG()) {
+            if (Platforms.PackageManager.current() == Platforms.PackageManager.DPKG) {
                 sh.run("addgroup --system elasticsearch");
             } else {
                 sh.run("groupadd -r elasticsearch");
@@ -124,7 +126,7 @@ public class Archives {
         }
 
         if (sh.runIgnoreExitCode("id elasticsearch").isSuccess() == false) {
-            if (isDPKG()) {
+            if (Platforms.PackageManager.current() == Platforms.PackageManager.DPKG) {
                 sh.run("adduser " +
                     "--quiet " +
                     "--system " +
@@ -282,7 +284,7 @@ public class Archives {
 
         final Installation.Executables bin = installation.executables();
 
-        if (Platforms.WINDOWS == false) {
+        if (Platforms.OS.current() != Platforms.OS.WINDOWS) {
             // If jayatana is installed then we try to use it. Elasticsearch should ignore it even when we try.
             // If it doesn't ignore it then Elasticsearch will fail to start because of security errors.
             // This line is attempting to emulate the on login behavior of /usr/share/upstart/sessions/jayatana.conf
@@ -350,15 +352,18 @@ public class Archives {
         String pid = slurp(pidFile).trim();
         assertThat(pid, is(not(emptyOrNullString())));
 
-        Platforms.onLinux(() -> sh.run("kill -SIGTERM " + pid + "; tail --pid=" + pid + " -f /dev/null"));
-        Platforms.onWindows(() -> {
-            sh.run("Get-Process -Id " + pid + " | Stop-Process -Force; Wait-Process -Id " + pid);
+        Platforms.OsConditional.conditional()
+            .onLinux(() -> sh.run("kill -SIGTERM " + pid + "; tail --pid=" + pid + " -f /dev/null"))
+            .onWindows(() -> {
+                sh.run("Get-Process -Id " + pid + " | Stop-Process -Force; Wait-Process -Id " + pid);
 
-            // Clear the asynchronous event handlers
-            sh.runIgnoreExitCode("Get-EventSubscriber | " +
-                "where {($_.EventName -eq 'OutputDataReceived' -Or $_.EventName -eq 'ErrorDataReceived' |" +
-                "Unregister-EventSubscriber -Force");
-        });
+                // Clear the asynchronous event handlers
+                sh.runIgnoreExitCode("Get-EventSubscriber | " +
+                    "where {($_.EventName -eq 'OutputDataReceived' -Or $_.EventName -eq 'ErrorDataReceived' |" +
+                    "Unregister-EventSubscriber -Force");
+            })
+            .noDarwinTest()
+            .run();
     }
 
 }

@@ -20,6 +20,7 @@
 package org.elasticsearch.packaging.test;
 
 import org.elasticsearch.packaging.util.Distribution;
+import org.elasticsearch.packaging.util.Platforms;
 import org.elasticsearch.packaging.util.Shell;
 import org.junit.BeforeClass;
 
@@ -36,7 +37,6 @@ import static org.elasticsearch.packaging.util.Packages.assertRemoved;
 import static org.elasticsearch.packaging.util.Packages.installPackage;
 import static org.elasticsearch.packaging.util.Packages.remove;
 import static org.elasticsearch.packaging.util.Packages.verifyPackageInstallation;
-import static org.elasticsearch.packaging.util.Platforms.isSystemd;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assume.assumeTrue;
 
@@ -97,7 +97,7 @@ public class RpmPreservationTests extends PackagingTestCase {
         remove(distribution());
         assertRemoved(distribution());
 
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             assertThat(sh.runIgnoreExitCode("systemctl is-enabled elasticsearch.service").exitCode, is(1));
         }
 

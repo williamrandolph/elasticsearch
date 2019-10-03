@@ -71,7 +71,7 @@ public class FileMatcher extends TypeSafeMatcher<Path> {
             return false;
         }
 
-        if (Platforms.WINDOWS) {
+        if (Platforms.OS.current() == Platforms.OS.WINDOWS) {
             final BasicFileAttributes attributes = getBasicFileAttributes(path);
             final String attributeViewOwner = getFileOwner(path);
 

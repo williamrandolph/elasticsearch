@@ -222,23 +222,25 @@ public class KeystoreManagementTests extends PackagingTestCase {
     private void createKeystore() throws Exception {
         Path keystore = installation.config("elasticsearch.keystore");
         final Installation.Executables bin = installation.executables();
-        Platforms.onLinux(() -> {
-            selectOnPackaging(
-                () -> sh.run(bin.elasticsearchKeystore + " create"),
-                () -> sh.run("sudo -u " + ARCHIVE_OWNER + " " + bin.elasticsearchKeystore + " create"));
-        });
-
-        // this is a hack around the fact that we can't run a command in the same session as the same user but not as administrator.
-        // the keystore ends up being owned by the Administrators group, so we manually set it to be owned by the vagrant user here.
-        // from the server's perspective the permissions aren't really different, this is just to reflect what we'd expect in the tests.
-        // when we run these commands as a role user we won't have to do this
-        Platforms.onWindows(() -> sh.run(
-            bin.elasticsearchKeystore + " create; " +
-                "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
-                "$acl = Get-Acl '" + keystore + "'; " +
-                "$acl.SetOwner($account); " +
-                "Set-Acl '" + keystore + "' $acl"
-        ));
+        Platforms.OsConditional.conditional()
+            .onLinux(() -> {
+                selectOnPackaging(
+                    () -> sh.run(bin.elasticsearchKeystore + " create"),
+                    () -> sh.run("sudo -u " + ARCHIVE_OWNER + " " + bin.elasticsearchKeystore + " create"));
+            })
+            // this is a hack around the fact that we can't run a command in the same session as the same user but not as administrator.
+            // the keystore ends up being owned by the Administrators group, so we manually set it to be owned by the vagrant user here.
+            // from the server's perspective the permissions aren't really different, this is just to reflect what we'd expect in the tests.
+            // when we run these commands as a role user we won't have to do this
+            .onWindows(() -> sh.run(
+                bin.elasticsearchKeystore + " create; " +
+                    "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
+                    "$acl = Get-Acl '" + keystore + "'; " +
+                    "$acl.SetOwner($account); " +
+                    "Set-Acl '" + keystore + "' $acl"
+            ))
+            .noDarwinTest()
+            .run();
     }
 
     private void rmKeystoreIfExists() {
@@ -252,18 +254,21 @@ public class KeystoreManagementTests extends PackagingTestCase {
         final Installation.Executables bin = installation.executables();
 
         // set the password by passing it to stdin twice
-        Platforms.onLinux(() ->
-            selectOnPackaging(
-                () -> sh.run("( echo \'" + password + "\' ; echo \'" + password + "\' ) | " +
-                    bin.elasticsearchKeystore + " passwd"),
-                () -> sh.run("( echo \'" + password + "\' ; echo \'" + password + "\' ) | " +
-                    "sudo -u " + ARCHIVE_OWNER + " " + bin.elasticsearchKeystore + " passwd")
+        Platforms.OsConditional.conditional()
+            .onLinux(() ->
+                selectOnPackaging(
+                    () -> sh.run("( echo \'" + password + "\' ; echo \'" + password + "\' ) | " +
+                        bin.elasticsearchKeystore + " passwd"),
+                    () -> sh.run("( echo \'" + password + "\' ; echo \'" + password + "\' ) | " +
+                        "sudo -u " + ARCHIVE_OWNER + " " + bin.elasticsearchKeystore + " passwd")
+                )
             )
-        );
-        Platforms.onWindows(() -> {
-            sh.run("Invoke-Command -ScriptBlock {echo \'" + password + "\'; echo \'" + password + "\'} | "
-                + bin.elasticsearchKeystore + " passwd");
-        });
+            .onWindows(() -> {
+                sh.run("Invoke-Command -ScriptBlock {echo \'" + password + "\'; echo \'" + password + "\'} | "
+                    + bin.elasticsearchKeystore + " passwd");
+            })
+            .noDarwinTest()
+            .run();
     }
 
     private void assertPasswordProtectedKeystore() {
@@ -276,7 +281,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
         void run() throws Exception;
     }
 
-    private static void selectOnPackaging(ExceptionalRunnable forPackage, ExceptionalRunnable forArchive) throws Exception {
+    private static void selectOnPackaging(Platforms.PlatformAction forPackage, Platforms.PlatformAction forArchive) throws Exception {
         assertTrue("Distribution must be package or archive",
             distribution.isPackage() || distribution.isArchive());
         if (distribution.isPackage()) {

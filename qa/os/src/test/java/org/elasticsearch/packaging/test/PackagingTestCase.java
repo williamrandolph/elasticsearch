@@ -73,10 +73,10 @@ public abstract class PackagingTestCase extends Assert {
     protected static final String systemJavaHome;
     static {
         Shell sh = new Shell();
-        if (Platforms.LINUX) {
+        if (Platforms.OS.current() == Platforms.OS.LINUX) {
             systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout.trim();
         } else {
-            assert Platforms.WINDOWS;
+            assert Platforms.OS.current() == Platforms.OS.WINDOWS;
             systemJavaHome = sh.run("$Env:SYSTEM_JAVA_HOME").stdout.trim();
         }
     }
@@ -130,12 +130,15 @@ public abstract class PackagingTestCase extends Assert {
     protected Shell newShell() throws Exception {
         Shell sh = new Shell();
         if (distribution().hasJdk == false) {
-            Platforms.onLinux(() -> {
-                sh.getEnv().put("JAVA_HOME", systemJavaHome);
-            });
-            Platforms.onWindows(() -> {
-                sh.getEnv().put("JAVA_HOME", systemJavaHome);
-            });
+            Platforms.OsConditional.conditional()
+                .onLinux(() -> {
+                    sh.getEnv().put("JAVA_HOME", systemJavaHome);
+                })
+                .onWindows(() -> {
+                    sh.getEnv().put("JAVA_HOME", systemJavaHome);
+                })
+                .noDarwinTest()
+                .run();
         }
         return sh;
     }
@@ -188,14 +191,14 @@ public abstract class PackagingTestCase extends Assert {
             String logfile = FileUtils.slurp(installation.logs.resolve("elasticsearch.log"));
             assertThat(logfile, containsString(expectedMessage));
 
-        } else if (distribution().isPackage() && Platforms.isSystemd()) {
+        } else if (distribution().isPackage() && Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
 
             // For systemd, retrieve the error from journalctl
             assertThat(result.stderr, containsString("Job for elasticsearch.service failed"));
             Shell.Result error = sh.run("journalctl --boot --unit elasticsearch.service");
             assertThat(error.stdout, containsString(expectedMessage));
 
-        } else if (Platforms.WINDOWS == true) {
+        } else if (Platforms.OS.current() == Platforms.OS.WINDOWS) {
 
             // In Windows, we have written our stdout and stderr to files in order to run
             // in the background

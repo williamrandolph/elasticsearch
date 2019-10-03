@@ -59,10 +59,10 @@ public class Distribution {
 
     public enum Packaging {
 
-        TAR(".tar.gz", Platforms.LINUX || Platforms.DARWIN),
-        ZIP(".zip", Platforms.WINDOWS),
-        DEB(".deb", Platforms.isDPKG()),
-        RPM(".rpm", Platforms.isRPM());
+        TAR(".tar.gz", Platforms.OS.current() == Platforms.OS.LINUX || Platforms.OS.current() == Platforms.OS.DARWIN),
+        ZIP(".zip", Platforms.OS.current() == Platforms.OS.WINDOWS),
+        DEB(".deb", Platforms.PackageManager.current() == Platforms.PackageManager.DPKG),
+        RPM(".rpm", Platforms.PackageManager.current() == Platforms.PackageManager.RPM);
 
         /** The extension of this distribution's file */
         public final String extension;

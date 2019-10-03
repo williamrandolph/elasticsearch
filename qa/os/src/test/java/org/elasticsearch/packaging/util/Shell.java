@@ -73,7 +73,7 @@ public class Shell {
         return run(formattedCommand);
     }
     private String[] getScriptCommand(String script) {
-        if (Platforms.WINDOWS) {
+        if (Platforms.OS.current() == Platforms.OS.WINDOWS) {
             return powershellCommand(script);
         } else {
             return bashCommand(script);

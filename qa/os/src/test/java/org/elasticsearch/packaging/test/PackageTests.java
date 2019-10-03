@@ -23,6 +23,7 @@ import com.carrotsearch.randomizedtesting.generators.RandomStrings;
 import org.apache.http.client.fluent.Request;
 import org.elasticsearch.packaging.util.FileUtils;
 import org.elasticsearch.packaging.util.Packages;
+import org.elasticsearch.packaging.util.Platforms;
 import org.elasticsearch.packaging.util.Shell.Result;
 import org.hamcrest.CoreMatchers;
 import org.junit.BeforeClass;
@@ -52,7 +53,6 @@ import static org.elasticsearch.packaging.util.Packages.installPackage;
 import static org.elasticsearch.packaging.util.Packages.remove;
 import static org.elasticsearch.packaging.util.Packages.verifyPackageInstallation;
 import static org.elasticsearch.packaging.util.Platforms.getOsRelease;
-import static org.elasticsearch.packaging.util.Platforms.isSystemd;
 import static org.elasticsearch.packaging.util.ServerUtils.makeRequest;
 import static org.elasticsearch.packaging.util.ServerUtils.runElasticsearchTests;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -82,7 +82,7 @@ public class PackageTests extends PackagingTestCase {
     }
 
     public void test30DaemonIsNotEnabledOnRestart() {
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             sh.run("systemctl daemon-reload");
             String isEnabledOutput = sh.runIgnoreExitCode("systemctl is-enabled elasticsearch.service").stdout.trim();
             assertThat(isEnabledOutput, equalTo("disabled"));
@@ -172,7 +172,7 @@ public class PackageTests extends PackagingTestCase {
         // removing must stop the service
         assertThat(sh.run("ps aux").stdout, not(containsString("org.elasticsearch.bootstrap.Elasticsearch")));
 
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
 
             final int statusExitCode;
 
@@ -268,7 +268,7 @@ public class PackageTests extends PackagingTestCase {
      * # see https://github.com/elastic/elasticsearch/issues/11594
      */
     public void test80DeletePID_DIRandRestart() throws Exception {
-        assumeTrue(isSystemd());
+        assumeTrue(Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD);
 
         rm(installation.pidDir);
 
@@ -284,7 +284,7 @@ public class PackageTests extends PackagingTestCase {
     }
 
     public void test81CustomPathConfAndJvmOptions() throws Exception {
-        assumeTrue(isSystemd());
+        assumeTrue(Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD);
 
         assertPathsExist(installation.envFile);
 
@@ -335,7 +335,7 @@ public class PackageTests extends PackagingTestCase {
 
     public void test82SystemdMask() throws Exception {
         try {
-            assumeTrue(isSystemd());
+            assumeTrue(Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD);
 
             sh.run("systemctl mask systemd-sysctl.service");
 
@@ -349,7 +349,7 @@ public class PackageTests extends PackagingTestCase {
 
     public void test83serviceFileSetsLimits() throws Exception {
         // Limits are changed on systemd platforms only
-        assumeTrue(isSystemd());
+        assumeTrue(Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD);
 
         installation = installPackage(distribution());
 

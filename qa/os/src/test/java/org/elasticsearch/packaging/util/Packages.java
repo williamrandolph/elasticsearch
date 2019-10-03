@@ -40,8 +40,6 @@ import static org.elasticsearch.packaging.util.FileMatcher.p660;
 import static org.elasticsearch.packaging.util.FileMatcher.p750;
 import static org.elasticsearch.packaging.util.FileMatcher.p755;
 import static org.elasticsearch.packaging.util.FileUtils.getCurrentVersion;
-import static org.elasticsearch.packaging.util.Platforms.isSysVInit;
-import static org.elasticsearch.packaging.util.Platforms.isSystemd;
 import static org.elasticsearch.packaging.util.ServerUtils.waitForElasticsearch;
 import static org.hamcrest.CoreMatchers.anyOf;
 import static org.hamcrest.CoreMatchers.containsString;
@@ -61,23 +59,29 @@ public class Packages {
         final Result status = packageStatus(distribution);
         assertThat(status.exitCode, is(0));
 
-        Platforms.onDPKG(() -> assertFalse(Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find()));
+        Platforms.PackageManagerConditional.condition()
+            .onDPKG(() -> assertFalse(Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find()))
+            .onRPM(Platforms.NO_ACTION)
+            .onNone(Platforms.NO_ACTION)
+            .run();
     }
 
     public static void assertRemoved(Distribution distribution) throws Exception {
         final Result status = packageStatus(distribution);
 
-        Platforms.onRPM(() -> assertThat(status.exitCode, is(1)));
-
-        Platforms.onDPKG(() -> {
-            assertThat(status.exitCode, anyOf(is(0), is(1)));
-            if (status.exitCode == 0) {
-                assertTrue("an uninstalled status should be indicated: " + status.stdout,
-                    Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find() ||
-                    Pattern.compile("(?m)^Status:.+ok not-installed").matcher(status.stdout).find()
-                );
-            }
-        });
+        Platforms.PackageManagerConditional.condition()
+            .onRPM(() -> assertThat(status.exitCode, is(1)))
+            .onDPKG(() -> {
+                assertThat(status.exitCode, anyOf(is(0), is(1)));
+                if (status.exitCode == 0) {
+                    assertTrue("an uninstalled status should be indicated: " + status.stdout,
+                        Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find() ||
+                        Pattern.compile("(?m)^Status:.+ok not-installed").matcher(status.stdout).find()
+                    );
+                }
+            })
+            .onNone(Platforms.NO_ACTION)
+            .run();
     }
 
     public static Result packageStatus(Distribution distribution) {
@@ -117,7 +121,7 @@ public class Packages {
     public static Result runInstallCommand(Distribution distribution, Shell sh) {
         final Path distributionFile = distribution.path;
 
-        if (Platforms.isRPM()) {
+        if (Platforms.PackageManager.current() == Platforms.PackageManager.RPM) {
             return sh.runIgnoreExitCode("rpm -i " + distributionFile);
         } else {
             Result r = sh.runIgnoreExitCode("dpkg -i " + distributionFile);
@@ -136,18 +140,20 @@ public class Packages {
     public static void remove(Distribution distribution) throws Exception {
         final Shell sh = new Shell();
 
-        Platforms.onRPM(() -> {
-            sh.run("rpm -e " + distribution.flavor.name);
-            final Result status = packageStatus(distribution);
-            assertThat(status.exitCode, is(1));
-        });
-
-        Platforms.onDPKG(() -> {
-            sh.run("dpkg -r " + distribution.flavor.name);
-            final Result status = packageStatus(distribution);
-            assertThat(status.exitCode, is(0));
-            assertTrue(Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find());
-        });
+        Platforms.PackageManagerConditional.condition()
+            .onRPM(() -> {
+                sh.run("rpm -e " + distribution.flavor.name);
+                final Result status = packageStatus(distribution);
+                assertThat(status.exitCode, is(1));
+            })
+            .onDPKG(() -> {
+                sh.run("dpkg -r " + distribution.flavor.name);
+                final Result status = packageStatus(distribution);
+                assertThat(status.exitCode, is(0));
+                assertTrue(Pattern.compile("(?m)^Status:.+deinstall ok").matcher(status.stdout).find());
+            })
+            .onNone(Platforms.NO_ACTION)
+            .run();
     }
 
     public static void verifyPackageInstallation(Installation installation, Distribution distribution, Shell sh) {
@@ -220,7 +226,7 @@ public class Packages {
             assertThat(copyrightDir.resolve("copyright"), file(File, "root", "root", p644));
         }
 
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             Stream.of(
                 SYSTEMD_SERVICE,
                 Paths.get("/usr/lib/tmpfiles.d/elasticsearch.conf"),
@@ -233,7 +239,7 @@ public class Packages {
             assertThat(sh.run(sysctlExecutable + " vm.max_map_count").stdout, containsString("vm.max_map_count = 262144"));
         }
 
-        if (isSysVInit()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSVINIT) {
             assertThat(SYSVINIT_SCRIPT, file(File, "root", "root", p750));
         }
     }
@@ -268,7 +274,7 @@ public class Packages {
     }
 
     public static Shell.Result startElasticsearch(Shell sh) throws IOException {
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             sh.run("systemctl daemon-reload");
             sh.run("systemctl enable elasticsearch.service");
             sh.run("systemctl is-enabled elasticsearch.service");
@@ -280,7 +286,7 @@ public class Packages {
     public static void assertElasticsearchStarted(Shell sh) throws IOException {
         waitForElasticsearch();
 
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             sh.run("systemctl is-active elasticsearch.service");
             sh.run("systemctl status elasticsearch.service");
         } else {
@@ -289,7 +295,7 @@ public class Packages {
     }
 
     public static void stopElasticsearch(Shell sh) throws IOException {
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             sh.run("systemctl stop elasticsearch.service");
         } else {
             sh.run("service elasticsearch stop");
@@ -297,7 +303,7 @@ public class Packages {
     }
 
     public static Shell.Result restartElasticsearch(Shell sh) throws IOException {
-        if (isSystemd()) {
+        if (Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             return sh.run("systemctl restart elasticsearch.service");
         } else {
             return sh.run("service elasticsearch restart");

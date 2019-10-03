@@ -109,7 +109,7 @@ public class Installation {
         public final Path elasticsearchUsers = platformExecutable("elasticsearch-users");
 
         private Path platformExecutable(String name) {
-            final String platformExecutableName = Platforms.WINDOWS
+            final String platformExecutableName = Platforms.OS.current() == Platforms.OS.WINDOWS
                 ? name + ".bat"
                 : name;
             return bin(platformExecutableName);

@@ -27,9 +27,6 @@ import java.util.List;
 
 import static org.elasticsearch.packaging.util.FileUtils.getTempDir;
 import static org.elasticsearch.packaging.util.FileUtils.lsGlob;
-import static org.elasticsearch.packaging.util.Platforms.isDPKG;
-import static org.elasticsearch.packaging.util.Platforms.isRPM;
-import static org.elasticsearch.packaging.util.Platforms.isSystemd;
 
 public class Cleanup {
 
@@ -54,32 +51,37 @@ public class Cleanup {
         final Shell sh = new Shell();
 
         // kill elasticsearch processes
-        Platforms.onLinux(() -> {
-            sh.runIgnoreExitCode("pkill -u elasticsearch");
-            sh.runIgnoreExitCode("ps aux | grep -i 'org.elasticsearch.bootstrap.Elasticsearch' | awk {'print $2'} | xargs kill -9");
-        });
+        Platforms.OsConditional.conditional()
+            .onLinux(() -> {
+                sh.runIgnoreExitCode("pkill -u elasticsearch");
+                sh.runIgnoreExitCode("ps aux | grep -i 'org.elasticsearch.bootstrap.Elasticsearch' | awk {'print $2'} | xargs kill -9");
+            })
 
-        Platforms.onWindows(() -> {
-            // the view of processes returned by Get-Process doesn't expose command line arguments, so we use WMI here
-            sh.runIgnoreExitCode(
-                "Get-WmiObject Win32_Process | " +
-                "Where-Object { $_.CommandLine -Match 'org.elasticsearch.bootstrap.Elasticsearch' } | " +
-                "ForEach-Object { $_.Terminate() }"
-            );
-        });
+            .onWindows(() -> {
+                // the view of processes returned by Get-Process doesn't expose command line arguments, so we use WMI here
+                sh.runIgnoreExitCode(
+                    "Get-WmiObject Win32_Process | " +
+                    "Where-Object { $_.CommandLine -Match 'org.elasticsearch.bootstrap.Elasticsearch' } | " +
+                    "ForEach-Object { $_.Terminate() }"
+                );
+            })
+            .noDarwinTest()
+            .run();
 
-        Platforms.onLinux(Cleanup::purgePackagesLinux);
-
-        // remove elasticsearch users
-        Platforms.onLinux(() -> {
-            sh.runIgnoreExitCode("userdel elasticsearch");
-            sh.runIgnoreExitCode("groupdel elasticsearch");
-        });
+        Platforms.OsConditional.conditional()
+            .onLinux(Cleanup::purgePackagesLinux)
+            // remove elasticsearch users
+            .onWindows(() -> {
+                sh.runIgnoreExitCode("userdel elasticsearch");
+                sh.runIgnoreExitCode("groupdel elasticsearch");
+            })
+            .noDarwinTest()
+            .run();
         // when we run es as a role user on windows, add the equivalent here
 
         // delete files that may still exist
         lsGlob(getTempDir(), "elasticsearch*").forEach(FileUtils::rm);
-        final List<String> filesToDelete = Platforms.WINDOWS
+        final List<String> filesToDelete = Platforms.OS.current() == Platforms.OS.WINDOWS
             ? ELASTICSEARCH_FILES_WINDOWS
             : ELASTICSEARCH_FILES_LINUX;
         filesToDelete.stream()
@@ -89,7 +91,7 @@ public class Cleanup {
 
         // disable elasticsearch service
         // todo add this for windows when adding tests for service intallation
-        if (Platforms.LINUX && isSystemd()) {
+        if (Platforms.OS.current() == Platforms.OS.LINUX && Platforms.ServiceManager.current() == Platforms.ServiceManager.SYSTEMD) {
             sh.run("systemctl unmask systemd-sysctl.service");
         }
     }
@@ -97,14 +99,14 @@ public class Cleanup {
     private static void purgePackagesLinux() {
         final Shell sh = new Shell();
 
-        if (isRPM()) {
+        if (Platforms.PackageManager.current() == Platforms.PackageManager.RPM) {
             // Doing rpm erase on both packages in one command will remove neither since both cannot be installed
             // this may leave behind config files in /etc/elasticsearch, but a later step in this cleanup will get them
             sh.runIgnoreExitCode("rpm --quiet -e elasticsearch");
             sh.runIgnoreExitCode("rpm --quiet -e elasticsearch-oss");
         }
 
-        if (isDPKG()) {
+        if (Platforms.PackageManager.current() == Platforms.PackageManager.DPKG) {
             sh.runIgnoreExitCode("dpkg --purge elasticsearch elasticsearch-oss");
         }
     }

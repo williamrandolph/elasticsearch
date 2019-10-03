@@ -39,7 +39,7 @@ public class RpmMetadataTests extends PackagingTestCase {
 
     public void test11Dependencies() {
         // TODO: rewrite this test to not use a real second distro to try and install
-        assumeTrue(Platforms.isRPM());
+        assumeTrue(Platforms.PackageManager.current() == Platforms.PackageManager.RPM);
 
         final Shell sh = new Shell();
 

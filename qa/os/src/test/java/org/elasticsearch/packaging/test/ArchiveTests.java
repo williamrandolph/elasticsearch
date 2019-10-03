@@ -112,14 +112,17 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void assertRunsWithJavaHome() throws Exception {
-        Platforms.onLinux(() -> {
-            String systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout.trim();
-            sh.getEnv().put("JAVA_HOME", systemJavaHome);
-        });
-        Platforms.onWindows(() -> {
-            final String systemJavaHome = sh.run("$Env:SYSTEM_JAVA_HOME").stdout.trim();
-            sh.getEnv().put("JAVA_HOME", systemJavaHome);
-        });
+        Platforms.OsConditional.conditional()
+            .onLinux(() -> {
+                String systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout.trim();
+                sh.getEnv().put("JAVA_HOME", systemJavaHome);
+            })
+            .onWindows(() -> {
+                final String systemJavaHome = sh.run("$Env:SYSTEM_JAVA_HOME").stdout.trim();
+                sh.getEnv().put("JAVA_HOME", systemJavaHome);
+            })
+            .noDarwinTest()
+            .run();
 
         awaitElasticsearchStartup(Archives.startElasticsearch(installation, sh));
         ServerUtils.runElasticsearchTests();
@@ -147,50 +150,52 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test53JavaHomeWithSpecialCharacters() throws Exception {
-        Platforms.onWindows(() -> {
-            final Shell sh = newShell();
-            try {
-                // once windows 2012 is no longer supported and powershell 5.0 is always available we can change this command
-                sh.run("cmd /c mklink /D 'C:\\Program Files (x86)\\java' $Env:SYSTEM_JAVA_HOME");
+        Platforms.OsConditional.conditional()
+            .onWindows(() -> {
+                final Shell sh = newShell();
+                try {
+                    // once windows 2012 is no longer supported and powershell 5.0 is always available we can change this command
+                    sh.run("cmd /c mklink /D 'C:\\Program Files (x86)\\java' $Env:SYSTEM_JAVA_HOME");
 
-                sh.getEnv().put("JAVA_HOME", "C:\\Program Files (x86)\\java");
+                    sh.getEnv().put("JAVA_HOME", "C:\\Program Files (x86)\\java");
 
-                //verify ES can start, stop and run plugin list
-                awaitElasticsearchStartup(Archives.startElasticsearch(installation, sh));
+                    //verify ES can start, stop and run plugin list
+                    awaitElasticsearchStartup(Archives.startElasticsearch(installation, sh));
 
-                Archives.stopElasticsearch(installation, sh);
+                    Archives.stopElasticsearch(installation, sh);
 
-                String pluginListCommand = installation.bin + "/elasticsearch-plugin list";
-                Result result = sh.run(pluginListCommand);
-                assertThat(result.exitCode, equalTo(0));
+                    String pluginListCommand = installation.bin + "/elasticsearch-plugin list";
+                    Result result = sh.run(pluginListCommand);
+                    assertThat(result.exitCode, equalTo(0));
 
-            } finally {
-                //clean up sym link
-                sh.run("cmd /c rmdir 'C:\\Program Files (x86)\\java' ");
-            }
-        });
+                } finally {
+                    //clean up sym link
+                    sh.run("cmd /c rmdir 'C:\\Program Files (x86)\\java' ");
+                }
+            })
+            .onLinux(() -> {
+                final Shell sh = newShell();
+                // Create temporary directory with a space and link to real java home
+                String testJavaHome = Paths.get("/tmp", "java home").toString();
+                try {
+                    final String systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout.trim();
+                    sh.run("ln -s \"" + systemJavaHome + "\" \"" + testJavaHome + "\"");
+                    sh.getEnv().put("JAVA_HOME", testJavaHome);
 
-        Platforms.onLinux(() -> {
-            final Shell sh = newShell();
-            // Create temporary directory with a space and link to real java home
-            String testJavaHome = Paths.get("/tmp", "java home").toString();
-            try {
-                final String systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout.trim();
-                sh.run("ln -s \"" + systemJavaHome + "\" \"" + testJavaHome + "\"");
-                sh.getEnv().put("JAVA_HOME", testJavaHome);
+                    //verify ES can start, stop and run plugin list
+                    awaitElasticsearchStartup(Archives.startElasticsearch(installation, sh));
 
-                //verify ES can start, stop and run plugin list
-                awaitElasticsearchStartup(Archives.startElasticsearch(installation, sh));
+                    Archives.stopElasticsearch(installation, sh);
 
-                Archives.stopElasticsearch(installation, sh);
-
-                String pluginListCommand = installation.bin + "/elasticsearch-plugin list";
-                Result result = sh.run(pluginListCommand);
-                assertThat(result.exitCode, equalTo(0));
-            } finally {
-                FileUtils.rm(Paths.get(testJavaHome));
-            }
-        });
+                    String pluginListCommand = installation.bin + "/elasticsearch-plugin list";
+                    Result result = sh.run(pluginListCommand);
+                    assertThat(result.exitCode, equalTo(0));
+                } finally {
+                    FileUtils.rm(Paths.get(testJavaHome));
+                }
+            })
+            .noDarwinTest()
+            .run();
     }
 
     public void test70CustomPathConfAndJvmOptions() throws Exception {
@@ -211,17 +216,20 @@ public class ArchiveTests extends PackagingTestCase {
                 "-Dlog4j2.disable.jmx=true\n";
             append(tempConf.resolve("jvm.options"), jvmOptions);
 
-            Platforms.onLinux(() -> sh.run("chown -R elasticsearch:elasticsearch " + tempConf));
-            Platforms.onWindows(() -> sh.run(
-                "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
-                "$tempConf = Get-ChildItem '" + tempConf + "' -Recurse; " +
-                "$tempConf += Get-Item '" + tempConf + "'; " +
-                "$tempConf | ForEach-Object { " +
-                    "$acl = Get-Acl $_.FullName; " +
-                    "$acl.SetOwner($account); " +
-                    "Set-Acl $_.FullName $acl " +
-                "}"
-            ));
+            Platforms.OsConditional.conditional()
+                .onLinux(() -> sh.run("chown -R elasticsearch:elasticsearch " + tempConf))
+                .onWindows(() -> sh.run(
+                    "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
+                    "$tempConf = Get-ChildItem '" + tempConf + "' -Recurse; " +
+                    "$tempConf += Get-Item '" + tempConf + "'; " +
+                    "$tempConf | ForEach-Object { " +
+                        "$acl = Get-Acl $_.FullName; " +
+                        "$acl.SetOwner($account); " +
+                        "Set-Acl $_.FullName $acl " +
+                    "}"
+                ))
+                .noDarwinTest()
+                .run();
 
             sh.getEnv().put("ES_PATH_CONF", tempConf.toString());
             sh.getEnv().put("ES_JAVA_OPTS", "-XX:-UseCompressedOops");
@@ -254,17 +262,20 @@ public class ArchiveTests extends PackagingTestCase {
 
             append(tempConf.resolve("elasticsearch.yml"), "node.name: relative");
 
-            Platforms.onLinux(() -> sh.run("chown -R elasticsearch:elasticsearch " + temp));
-            Platforms.onWindows(() -> sh.run(
-                "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
-                "$tempConf = Get-ChildItem '" + temp + "' -Recurse; " +
-                "$tempConf += Get-Item '" + temp + "'; " +
-                "$tempConf | ForEach-Object { " +
-                    "$acl = Get-Acl $_.FullName; " +
-                    "$acl.SetOwner($account); " +
-                    "Set-Acl $_.FullName $acl " +
-                "}"
-            ));
+            Platforms.OsConditional.conditional()
+                .onLinux(() -> sh.run("chown -R elasticsearch:elasticsearch " + temp))
+                .onWindows(() -> sh.run(
+                    "$account = New-Object System.Security.Principal.NTAccount 'vagrant'; " +
+                    "$tempConf = Get-ChildItem '" + temp + "' -Recurse; " +
+                    "$tempConf += Get-Item '" + temp + "'; " +
+                    "$tempConf | ForEach-Object { " +
+                        "$acl = Get-Acl $_.FullName; " +
+                        "$acl.SetOwner($account); " +
+                        "Set-Acl $_.FullName $acl " +
+                    "}"
+                ))
+                .noDarwinTest()
+                .run();
 
             sh.setWorkingDirectory(temp);
             sh.getEnv().put("ES_PATH_CONF", "config");
@@ -294,8 +305,11 @@ public class ArchiveTests extends PackagingTestCase {
                 assertThat(result.exitCode, is(not(0)));
                 assertThat(result.stderr, containsString("Unknown command [invalid-command]"));
             };
-            Platforms.onLinux(action);
-            Platforms.onWindows(action);
+            Platforms.OsConditional.conditional()
+                .onLinux(action)
+                .onWindows(action)
+                .noDarwinTest()
+                .run();
         } else {
             assertFalse(Files.exists(installation.lib.resolve("tools").resolve("security-cli")));
         }
@@ -311,8 +325,11 @@ public class ArchiveTests extends PackagingTestCase {
 
         // TODO: this should be checked on all distributions
         if (distribution().isDefault()) {
-            Platforms.onLinux(action);
-            Platforms.onWindows(action);
+            Platforms.OsConditional.conditional()
+                .onLinux(action)
+                .onWindows(action)
+                .noDarwinTest()
+                .run();
         }
     }
 
@@ -327,8 +344,11 @@ public class ArchiveTests extends PackagingTestCase {
 
         // TODO: this should be checked on all distributions
         if (distribution().isDefault()) {
-            Platforms.onLinux(action);
-            Platforms.onWindows(action);
+            Platforms.OsConditional.conditional()
+                .onLinux(action)
+                .onWindows(action)
+                .noDarwinTest()
+                .run();
         }
     }
 
@@ -367,8 +387,11 @@ public class ArchiveTests extends PackagingTestCase {
 
         // TODO: this should be checked on all distributions
         if (distribution().isDefault()) {
-            Platforms.onLinux(action);
-            Platforms.onWindows(action);
+            Platforms.OsConditional.conditional()
+                .onLinux(action)
+                .onWindows(action)
+                .noDarwinTest()
+                .run();
         }
     }
 
