@@ -40,7 +40,8 @@ public class ClientYamlTestExecutionContextTests extends ESTestCase {
             new ClientYamlTestExecutionContext(null, randomBoolean()) {
                 @Override
                 ClientYamlTestResponse callApiInternal(String apiName, Map<String, String> params,
-                        HttpEntity entity, Map<String, String> headers, NodeSelector nodeSelector) {
+                                                       HttpEntity entity, Map<String, String> headers, NodeSelector nodeSelector,
+                                                       boolean preferNonDeprecatedApiPaths) {
                     headersRef.set(headers);
                     return null;
                 }

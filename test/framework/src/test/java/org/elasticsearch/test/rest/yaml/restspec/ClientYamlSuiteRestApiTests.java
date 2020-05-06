@@ -27,6 +27,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static org.hamcrest.Matchers.equalTo;
+
 public class ClientYamlSuiteRestApiTests extends ESTestCase {
 
     public void testParseCommonSpec() throws IOException {
@@ -66,15 +68,89 @@ public class ClientYamlSuiteRestApiTests extends ESTestCase {
         }
         {
             List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("index", "type"));
-            assertEquals(3, paths.size());
+            assertEquals(2, paths.size());
             assertEquals("/{index}/_mapping/{type}", paths.get(0).getPath());
-            assertEquals("/{index}/{type}", paths.get(1).getPath());
-            assertEquals("/{index}/_mappings/{type}", paths.get(2).getPath());
+            assertEquals("/{index}/_mappings/{type}", paths.get(1).getPath());
+        }
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("index", "type"), false);
+            assertEquals(1, paths.size());
+            assertEquals("/{index}/{type}", paths.get(0).getPath());
         }
         {
             List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("index", "type", "id"));
             assertEquals(1, paths.size());
             assertEquals("/{index}/{type}/{id}", paths.get(0).getPath());
+        }
+    }
+
+    public void testGetNonDeprecatedMatchingPath() throws IOException {
+        XContentParser parser = createParser(YamlXContent.yamlXContent, DEPRECATION_TEST);
+        ClientYamlSuiteRestApi restApi = new ClientYamlSuiteRestApiParser().parse("index.json", parser);
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Collections.emptySet(), true);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(false));
+        }
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Collections.emptySet(), false);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(false));
+        }
+    }
+
+    public void testGetDeprecatedMatchingPaths() throws IOException {
+        XContentParser parser = createParser(YamlXContent.yamlXContent, DEPRECATION_TEST);
+        ClientYamlSuiteRestApi restApi = new ClientYamlSuiteRestApiParser().parse("index.json", parser);
+
+        // single deprecated path
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated1"), true);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(true));
+        }
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated1"), false);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(true));
+        }
+
+        // two deprecated paths
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated1", "deprecated2"), true);
+            assertThat(paths.size(), equalTo(2));
+            for (ClientYamlSuiteRestApi.Path chosen : paths) {
+                assertThat(chosen.isDeprecated(), equalTo(true));
+            }
+        }
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated1", "deprecated2"), false);
+            assertThat(paths.size(), equalTo(2));
+            for (ClientYamlSuiteRestApi.Path chosen : paths) {
+                assertThat(chosen.isDeprecated(), equalTo(true));
+            }
+        }
+    }
+
+    public void testGetPathFromPathsWithMixedDeprecation() throws IOException {
+        XContentParser parser = createParser(YamlXContent.yamlXContent, DEPRECATION_TEST);
+        ClientYamlSuiteRestApi restApi = new ClientYamlSuiteRestApiParser().parse("index.json", parser);
+        // two paths, only one is deprecated - different results with/without preferDeprecated
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated3", "deprecated4"), true);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(false));
+        }
+        {
+            List<ClientYamlSuiteRestApi.Path> paths = restApi.getBestMatchingPaths(Set.of("deprecated3", "deprecated4"), false);
+            assertThat(paths.size(), equalTo(1));
+            ClientYamlSuiteRestApi.Path chosen = paths.get(0);
+            assertThat(chosen.isDeprecated(), equalTo(true));
         }
     }
 
@@ -309,6 +385,127 @@ public class ClientYamlSuiteRestApiTests extends ESTestCase {
         "    \"body\":{\n" +
         "      \"description\":\"The document\",\n" +
         "      \"required\":true\n" +
+        "    }\n" +
+        "  }\n" +
+        "}\n";
+
+    private static final String DEPRECATION_TEST = "{\n" +
+        "  \"index\":{\n" +
+        "    \"documentation\":{\n" +
+        "      \"url\":\"https://www.elastic.co/guide/en/elasticsearch/reference/master/contrived-example.html\",\n" +
+        "      \"description\":\"Contrived example for deprecation testing\"\n" +
+        "    },\n" +
+        "    \"stability\":\"stable\",\n" +
+        "    \"url\":{\n" +
+        "      \"paths\":[\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint\",\n" +
+        "          \"methods\":[\n" +
+        "            \"PUT\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint/{deprecated1}\",\n" +
+        "          \"methods\":[\n" +
+        "            \"PUT\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "            \"deprecated1\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            }\n" +
+        "          },\n" +
+        "          \"deprecated\":{\n" +
+        "            \"version\":\"7.0.0\",\n" +
+        "            \"description\":\"One path, deprecated\"\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint/{deprecated1}/{deprecated2}\",\n" +
+        "          \"methods\":[\n" +
+        "            \"POST\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "            \"deprecated1\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            },\n" +
+        "            \"deprecated2\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            }\n" +
+        "          },\n" +
+        "          \"deprecated\":{\n" +
+        "            \"version\":\"7.0.0\",\n" +
+        "            \"description\":\"Two paths, consistently deprecated\"\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint_alt/{deprecated1}/{deprecated2}\",\n" +
+        "          \"methods\":[\n" +
+        "            \"POST\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "            \"deprecated1\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            },\n" +
+        "            \"deprecated2\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            }\n" +
+        "          },\n" +
+        "          \"deprecated\":{\n" +
+        "            \"version\":\"7.0.0\",\n" +
+        "            \"description\":\"Two paths, consistently deprecated\"\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint/{deprecated3}/{deprecated4}\",\n" +
+        "          \"methods\":[\n" +
+        "            \"POST\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "            \"deprecated3\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            },\n" +
+        "            \"deprecated4\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\",\n" +
+        "              \"deprecated\":true\n" +
+        "            }\n" +
+        "          },\n" +
+        "          \"deprecated\":{\n" +
+        "            \"version\":\"7.0.0\",\n" +
+        "            \"description\":\"Two paths, one deprecated and one non-deprecated\"\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"path\":\"/endpoint_alt/{deprecated3}/{deprecated4}\",\n" +
+        "          \"methods\":[\n" +
+        "            \"POST\"\n" +
+        "          ],\n" +
+        "          \"parts\":{\n" +
+        "            \"deprecated3\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\"\n" +
+        "            },\n" +
+        "            \"deprecated4\":{\n" +
+        "              \"type\":\"string\",\n" +
+        "              \"description\":\"A deprecated parameter\"\n" +
+        "            }\n" +
+        "          }\n" +
+        "        }\n" +
+        "      ]\n" +
         "    }\n" +
         "  }\n" +
         "}\n";

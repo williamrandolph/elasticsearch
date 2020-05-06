@@ -65,7 +65,7 @@ public class ClientYamlSuiteRestApi {
         return location;
     }
 
-    void addPath(String path, String[] methods, Set<String> parts) {
+    void addPath(String path, String[] methods, Set<String> parts, boolean deprecated) {
         Objects.requireNonNull(path, name + " API: path must not be null");
         Objects.requireNonNull(methods, name + " API: methods must not be null");
         if (methods.length == 0) {
@@ -77,7 +77,7 @@ public class ClientYamlSuiteRestApi {
                 throw new IllegalArgumentException(name + " API: part [" + part + "] not contained in path [" + path + "]");
             }
         }
-        boolean add = this.paths.add(new Path(path, methods, parts));
+        boolean add = this.paths.add(new Path(path, methods, parts, deprecated));
         if (add == false) {
             throw new IllegalArgumentException(name + " API: found duplicate path [" + path + "]");
         }
@@ -128,9 +128,30 @@ public class ClientYamlSuiteRestApi {
      * It returns a list instead of a single path as there are cases where there is more than one best matching path:
      * - /{index}/_alias/{name}, /{index}/_aliases/{name}
      * - /{index}/{type}/_mapping, /{index}/{type}/_mappings, /{index}/_mappings/{type}, /{index}/_mapping/{type}
+     *
+     * This single-argument version of the method avoids deprecated paths if possible.
      */
     public List<ClientYamlSuiteRestApi.Path> getBestMatchingPaths(Set<String> params) {
-        PriorityQueue<Tuple<Integer, Path>> queue = new PriorityQueue<>(Comparator.comparing(Tuple::v1, (a, b) -> Integer.compare(b, a)));
+        return getBestMatchingPaths(params, true);
+    }
+
+    /**
+     * Returns the best matching paths based on the provided parameters, which may include either path parts or query_string parameters.
+     * The best path is the one that has exactly the same number of placeholders to replace
+     * (e.g. /{index}/{type}/{id} when the path params are exactly index, type and id).
+     * It returns a list instead of a single path as there are cases where there is more than one best matching path:
+     * - /{index}/_alias/{name}, /{index}/_aliases/{name}
+     * - /{index}/{type}/_mapping, /{index}/{type}/_mappings, /{index}/_mappings/{type}, /{index}/_mapping/{type}
+     *
+     * @param preferNonDeprecated Return deprecated instead of undeprecated paths, if possible.
+     */
+    public List<ClientYamlSuiteRestApi.Path> getBestMatchingPaths(Set<String> params, boolean preferNonDeprecated) {
+        Comparator<Path> nonDeprecatedPathsFirst = Comparator.comparing(Path::isDeprecated, Boolean::compareTo);
+        Comparator<Path> deprecationComparator = preferNonDeprecated ? nonDeprecatedPathsFirst : nonDeprecatedPathsFirst.reversed();
+
+        PriorityQueue<Tuple<Integer, Path>> queue = new PriorityQueue<>(
+            Comparator.<Tuple<Integer, Path>, Integer>comparing(Tuple::v1, (a, b) -> Integer.compare(b, a))
+                .thenComparing(Tuple::v2, deprecationComparator));
         for (ClientYamlSuiteRestApi.Path path : paths) {
             int matches = 0;
             for (String actualParameter : params) {
@@ -148,10 +169,11 @@ public class ClientYamlSuiteRestApi {
         List<Path> paths = new ArrayList<>();
         Tuple<Integer, Path> poll = queue.poll();
         int maxMatches = poll.v1();
+        boolean isFirstMatchDeprecated = poll.v2().isDeprecated();
         do {
             paths.add(poll.v2());
             poll = queue.poll();
-        } while (poll != null && poll.v1() == maxMatches);
+        } while (poll != null && poll.v1() == maxMatches && poll.v2().isDeprecated() == isFirstMatchDeprecated);
 
         return paths;
     }
@@ -160,11 +182,13 @@ public class ClientYamlSuiteRestApi {
         private final String path;
         private final String[] methods;
         private final Set<String> parts;
+        private final boolean deprecated;
 
-        private Path(String path, String[] methods, Set<String> parts) {
+        private Path(String path, String[] methods, Set<String> parts, boolean deprecated) {
             this.path = path;
             this.methods = methods;
             this.parts = parts;
+            this.deprecated = deprecated;
         }
 
         public String getPath() {
@@ -177,6 +201,10 @@ public class ClientYamlSuiteRestApi {
 
         public Set<String> getParts() {
             return parts;
+        }
+
+        public boolean isDeprecated() {
+            return deprecated;
         }
 
         @Override

@@ -70,7 +70,7 @@ public class ClientYamlTestExecutionContext {
      */
     public ClientYamlTestResponse callApi(String apiName, Map<String, String> params, List<Map<String, Object>> bodies,
                                     Map<String, String> headers) throws IOException {
-        return callApi(apiName, params, bodies, headers, NodeSelector.ANY);
+        return callApi(apiName, params, bodies, headers, NodeSelector.ANY, true);
     }
 
     /**
@@ -78,7 +78,8 @@ public class ClientYamlTestExecutionContext {
      * Saves the obtained response in the execution context.
      */
     public ClientYamlTestResponse callApi(String apiName, Map<String, String> params, List<Map<String, Object>> bodies,
-                                    Map<String, String> headers, NodeSelector nodeSelector) throws IOException {
+                                          Map<String, String> headers, NodeSelector nodeSelector,
+                                          boolean preferNonDeprecatedApiPaths) throws IOException {
         //makes a copy of the parameters before modifying them for this specific request
         Map<String, String> requestParams = new HashMap<>(params);
         requestParams.putIfAbsent("error_trace", "true"); // By default ask for error traces, this my be overridden by params
@@ -98,7 +99,7 @@ public class ClientYamlTestExecutionContext {
 
         HttpEntity entity = createEntity(bodies, requestHeaders);
         try {
-            response = callApiInternal(apiName, requestParams, entity, requestHeaders, nodeSelector);
+            response = callApiInternal(apiName, requestParams, entity, requestHeaders, nodeSelector, preferNonDeprecatedApiPaths);
             return response;
         } catch(ClientYamlTestResponseException e) {
             response = e.getRestTestResponse();
@@ -165,8 +166,9 @@ public class ClientYamlTestExecutionContext {
 
     // pkg-private for testing
     ClientYamlTestResponse callApiInternal(String apiName, Map<String, String> params, HttpEntity entity,
-            Map<String, String> headers, NodeSelector nodeSelector) throws IOException  {
-        return clientYamlTestClient.callApi(apiName, params, entity, headers, nodeSelector);
+                                           Map<String, String> headers, NodeSelector nodeSelector,
+                                           boolean preferNonDeprecatedApiPaths) throws IOException  {
+        return clientYamlTestClient.callApi(apiName, params, entity, headers, nodeSelector, preferNonDeprecatedApiPaths);
     }
 
     /**

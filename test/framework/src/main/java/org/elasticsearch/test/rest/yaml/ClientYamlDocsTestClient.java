@@ -56,7 +56,8 @@ public final class ClientYamlDocsTestClient extends ClientYamlTestClient {
 
     @Override
     public ClientYamlTestResponse callApi(String apiName, Map<String, String> params, HttpEntity entity,
-            Map<String, String> headers, NodeSelector nodeSelector) throws IOException {
+                                          Map<String, String> headers, NodeSelector nodeSelector,
+                                          boolean preferNonDeprecatedApiPaths) throws IOException {
 
         if ("raw".equals(apiName)) {
             // Raw requests don't use the rest spec at all and are configured entirely by their parameters
@@ -77,6 +78,6 @@ public final class ClientYamlDocsTestClient extends ClientYamlTestClient {
                 throw new ClientYamlTestResponseException(e);
             }
         }
-        return super.callApi(apiName, params, entity, headers, nodeSelector);
+        return super.callApi(apiName, params, entity, headers, nodeSelector, preferNonDeprecatedApiPaths);
     }
 }

@@ -538,10 +538,10 @@ public class DoSectionTests extends AbstractClientYamlTestFragmentParserTestCase
         ClientYamlTestExecutionContext context = mock(ClientYamlTestExecutionContext.class);
         ClientYamlTestResponse mockResponse = mock(ClientYamlTestResponse.class);
         when(context.callApi("indices.get_field_mapping", singletonMap("index", "test_index"),
-                emptyList(), emptyMap(), doSection.getApiCallSection().getNodeSelector())).thenReturn(mockResponse);
+                emptyList(), emptyMap(), doSection.getApiCallSection().getNodeSelector(), true)).thenReturn(mockResponse);
         doSection.execute(context);
         verify(context).callApi("indices.get_field_mapping", singletonMap("index", "test_index"),
-                emptyList(), emptyMap(), doSection.getApiCallSection().getNodeSelector());
+                emptyList(), emptyMap(), doSection.getApiCallSection().getNodeSelector(), true);
 
         {
             List<Node> badNodes = new ArrayList<>();

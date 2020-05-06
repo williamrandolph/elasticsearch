@@ -95,14 +95,15 @@ public class ClientYamlTestClient implements Closeable {
      * Calls an api with the provided parameters and body
      */
     public ClientYamlTestResponse callApi(String apiName, Map<String, String> params, HttpEntity entity,
-            Map<String, String> headers, NodeSelector nodeSelector) throws IOException {
+                                          Map<String, String> headers, NodeSelector nodeSelector,
+                                          boolean preferNonDeprecatedApiPaths) throws IOException {
 
         ClientYamlSuiteRestApi restApi = restApi(apiName);
 
         Set<String> apiRequiredParameters = restApi.getParams().entrySet().stream().filter(Entry::getValue).map(Entry::getKey)
                 .collect(Collectors.toSet());
 
-        List<ClientYamlSuiteRestApi.Path> bestPaths = restApi.getBestMatchingPaths(params.keySet());
+        List<ClientYamlSuiteRestApi.Path> bestPaths = restApi.getBestMatchingPaths(params.keySet(), preferNonDeprecatedApiPaths);
         //the rest path to use is randomized out of the matching ones (if more than one)
         ClientYamlSuiteRestApi.Path path = RandomizedTest.randomFrom(bestPaths);
 

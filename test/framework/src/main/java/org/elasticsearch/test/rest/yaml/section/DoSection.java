@@ -81,6 +81,7 @@ import static org.junit.Assert.fail;
  *      allowed_warnings:
  *          - Maybe this warning shows up
  *          - But it isn't actually required for the test to pass.
+ *      prefer_non_deprecated_api_paths: true
  *      update:
  *          index:  test_1
  *          type:   test
@@ -111,6 +112,8 @@ public class DoSection implements ExecutableSection {
             } else if (token.isValue()) {
                 if ("catch".equals(currentFieldName)) {
                     doSection.setCatch(parser.text());
+                } else if ("prefer_non_deprecated_api_paths".equals(currentFieldName)) {
+                    doSection.setPreferNonDeprecatedApiPaths(parser.booleanValue());
                 } else {
                     throw new ParsingException(parser.getTokenLocation(), "unsupported field [" + currentFieldName + "]");
                 }
@@ -208,6 +211,7 @@ public class DoSection implements ExecutableSection {
     private ApiCallSection apiCallSection;
     private List<String> expectedWarningHeaders = emptyList();
     private List<String> allowedWarningHeaders = emptyList();
+    private boolean preferNonDeprecatedPaths = true;
 
     public DoSection(XContentLocation location) {
         this.location = location;
@@ -261,6 +265,18 @@ public class DoSection implements ExecutableSection {
         this.allowedWarningHeaders = allowedWarningHeaders;
     }
 
+    /**
+     * In (hopefully) rare cases, an API may have deprecated and non-deprecated paths.
+     * In that case, we need a way to distinguish between those paths in tests.
+     */
+    public boolean shouldPreferNonDeprecatedApiPaths() {
+        return this.preferNonDeprecatedPaths;
+    }
+
+    public void setPreferNonDeprecatedApiPaths(boolean preferNonDeprecatedPaths) {
+        this.preferNonDeprecatedPaths = preferNonDeprecatedPaths;
+    }
+
     @Override
     public XContentLocation getLocation() {
         return location;
@@ -278,7 +294,8 @@ public class DoSection implements ExecutableSection {
 
         try {
             ClientYamlTestResponse response = executionContext.callApi(apiCallSection.getApi(), apiCallSection.getParams(),
-                    apiCallSection.getBodies(), apiCallSection.getHeaders(), apiCallSection.getNodeSelector());
+                apiCallSection.getBodies(), apiCallSection.getHeaders(), apiCallSection.getNodeSelector(),
+                shouldPreferNonDeprecatedApiPaths());
             if (Strings.hasLength(catchParam)) {
                 String catchStatusCode;
                 if (catches.containsKey(catchParam)) {
