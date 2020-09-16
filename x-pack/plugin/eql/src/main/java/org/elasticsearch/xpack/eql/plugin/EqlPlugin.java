@@ -47,13 +47,6 @@ import java.util.function.Supplier;
 
 public class EqlPlugin extends Plugin implements ActionPlugin {
 
-    public static final Setting<Boolean> EQL_ENABLED_SETTING = Setting.boolSetting(
-        "xpack.eql.enabled",
-        true,
-        Setting.Property.NodeScope,
-        Setting.Property.Deprecated
-    );
-
     public EqlPlugin() {
     }
 
@@ -79,7 +72,7 @@ public class EqlPlugin extends Plugin implements ActionPlugin {
      */
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(EQL_ENABLED_SETTING);
+        return List.of();
     }
 
     @Override
