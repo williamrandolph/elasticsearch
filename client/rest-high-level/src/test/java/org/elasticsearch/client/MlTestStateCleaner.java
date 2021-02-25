@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 package org.elasticsearch.client;
 
@@ -29,6 +18,7 @@ import org.elasticsearch.client.ml.GetDatafeedRequest;
 import org.elasticsearch.client.ml.GetDatafeedResponse;
 import org.elasticsearch.client.ml.GetJobRequest;
 import org.elasticsearch.client.ml.GetJobResponse;
+import org.elasticsearch.client.ml.StopDataFrameAnalyticsRequest;
 import org.elasticsearch.client.ml.StopDatafeedRequest;
 import org.elasticsearch.client.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.client.ml.dataframe.DataFrameAnalyticsConfig;
@@ -106,10 +96,28 @@ public class MlTestStateCleaner {
     }
 
     private void deleteAllDataFrameAnalytics() throws IOException {
+        stopAllDataFrameAnalytics();
+
         GetDataFrameAnalyticsResponse getDataFrameAnalyticsResponse =
             mlClient.getDataFrameAnalytics(GetDataFrameAnalyticsRequest.getAllDataFrameAnalyticsRequest(), RequestOptions.DEFAULT);
         for (DataFrameAnalyticsConfig config : getDataFrameAnalyticsResponse.getAnalytics()) {
             mlClient.deleteDataFrameAnalytics(new DeleteDataFrameAnalyticsRequest(config.getId()), RequestOptions.DEFAULT);
+        }
+    }
+
+    private void stopAllDataFrameAnalytics() {
+        StopDataFrameAnalyticsRequest stopAllRequest = new StopDataFrameAnalyticsRequest("*");
+        try {
+            mlClient.stopDataFrameAnalytics(stopAllRequest, RequestOptions.DEFAULT);
+        } catch (Exception e1) {
+            logger.warn("failed to stop all data frame analytics. Will proceed to force-stopping", e1);
+            stopAllRequest.setForce(true);
+            try {
+                mlClient.stopDataFrameAnalytics(stopAllRequest, RequestOptions.DEFAULT);
+            } catch (Exception e2) {
+                logger.warn("force-stopping all data frame analytics failed", e2);
+            }
+            throw new RuntimeException("Had to resort to force-stopping data frame analytics, something went wrong?", e1);
         }
     }
 }

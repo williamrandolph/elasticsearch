@@ -1,17 +1,23 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.ml.job.config;
 
+import org.elasticsearch.action.admin.indices.analyze.AnalyzeAction;
 import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
+import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
+import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.common.xcontent.ToXContentFragment;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.common.xcontent.json.JsonXContent;
 import org.elasticsearch.index.analysis.NameOrDefinition;
 import org.elasticsearch.rest.action.admin.indices.RestAnalyzeAction;
 
@@ -50,9 +56,9 @@ import java.util.Objects;
 public class CategorizationAnalyzerConfig implements ToXContentFragment, Writeable {
 
     public static final ParseField CATEGORIZATION_ANALYZER = new ParseField("categorization_analyzer");
-    public static final ParseField TOKENIZER = RestAnalyzeAction.Fields.TOKENIZER;
-    public static final ParseField TOKEN_FILTERS = RestAnalyzeAction.Fields.TOKEN_FILTERS;
-    public static final ParseField CHAR_FILTERS = RestAnalyzeAction.Fields.CHAR_FILTERS;
+    public static final ParseField TOKENIZER = AnalyzeAction.Fields.TOKENIZER;
+    public static final ParseField TOKEN_FILTERS = AnalyzeAction.Fields.TOKEN_FILTERS;
+    public static final ParseField CHAR_FILTERS = AnalyzeAction.Fields.CHAR_FILTERS;
 
     /**
      * This method is only used in the unit tests - in production code this config is always parsed as a fragment.
@@ -243,6 +249,18 @@ public class CategorizationAnalyzerConfig implements ToXContentFragment, Writeab
             builder.endObject();
         }
         return builder;
+    }
+
+    /**
+     * Get the categorization analyzer structured as a generic map.
+     * This can be used to provide the structure that the XContent serialization but as a Java map rather than text.
+     * Since it is created by round-tripping through text it is not particularly efficient and is expected to be
+     * used only rarely.
+     */
+    public Map<String, Object> asMap(NamedXContentRegistry xContentRegistry) throws IOException {
+        String strRep = Strings.toString(this);
+        XContentParser parser = JsonXContent.jsonXContent.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, strRep);
+        return parser.mapOrdered();
     }
 
     @Override

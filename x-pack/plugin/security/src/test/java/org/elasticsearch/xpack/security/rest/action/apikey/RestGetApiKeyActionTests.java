@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.security.rest.action.apikey;
@@ -22,7 +23,6 @@ import org.elasticsearch.env.Environment;
 import org.elasticsearch.license.XPackLicenseState;
 import org.elasticsearch.rest.AbstractRestChannel;
 import org.elasticsearch.rest.RestChannel;
-import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.test.ESTestCase;
@@ -46,7 +46,6 @@ import static org.mockito.Mockito.when;
 
 public class RestGetApiKeyActionTests extends ESTestCase {
     private final XPackLicenseState mockLicenseState = mock(XPackLicenseState.class);
-    private final RestController mockRestController = mock(RestController.class);
     private Settings settings = null;
     private ThreadPool threadPool = null;
 
@@ -56,8 +55,7 @@ public class RestGetApiKeyActionTests extends ESTestCase {
         settings = Settings.builder().put("path.home", createTempDir().toString()).put("node.name", "test-" + getTestName())
                 .put(Environment.PATH_HOME_SETTING.getKey(), createTempDir().toString()).build();
         threadPool = new ThreadPool(settings);
-        when(mockLicenseState.isSecurityAvailable()).thenReturn(true);
-        when(mockLicenseState.isApiKeyServiceAllowed()).thenReturn(true);
+        when(mockLicenseState.isSecurityEnabled()).thenReturn(true);
     }
 
     @Override
@@ -114,7 +112,7 @@ public class RestGetApiKeyActionTests extends ESTestCase {
                 }
             }
         }) {
-            final RestGetApiKeyAction restGetApiKeyAction = new RestGetApiKeyAction(Settings.EMPTY, mockRestController, mockLicenseState);
+            final RestGetApiKeyAction restGetApiKeyAction = new RestGetApiKeyAction(Settings.EMPTY, mockLicenseState);
 
             restGetApiKeyAction.handleRequest(restRequest, restChannel, client);
 
@@ -182,7 +180,7 @@ public class RestGetApiKeyActionTests extends ESTestCase {
                 }
             }
         }) {
-            final RestGetApiKeyAction restGetApiKeyAction = new RestGetApiKeyAction(Settings.EMPTY, mockRestController, mockLicenseState);
+            final RestGetApiKeyAction restGetApiKeyAction = new RestGetApiKeyAction(Settings.EMPTY, mockLicenseState);
 
             restGetApiKeyAction.handleRequest(restRequest, restChannel, client);
 

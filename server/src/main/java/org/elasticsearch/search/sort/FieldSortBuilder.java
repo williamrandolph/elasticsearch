@@ -1,51 +1,58 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.search.sort;
 
+import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.MultiTerms;
+import org.apache.lucene.index.PointValues;
+import org.apache.lucene.index.Terms;
 import org.apache.lucene.search.SortField;
+import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.Version;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.time.DateMathParser;
+import org.elasticsearch.common.time.DateUtils;
+import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.xcontent.ObjectParser;
 import org.elasticsearch.common.xcontent.ObjectParser.ValueType;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.IndexSortConfig;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.Nested;
 import org.elasticsearch.index.fielddata.IndexNumericFieldData;
 import org.elasticsearch.index.fielddata.IndexNumericFieldData.NumericType;
-import org.elasticsearch.index.fielddata.plain.SortedNumericDVIndexFieldData;
+import org.elasticsearch.index.mapper.DateFieldMapper.DateFieldType;
+import org.elasticsearch.index.mapper.KeywordFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
+import org.elasticsearch.index.mapper.NumberFieldMapper.NumberFieldType;
 import org.elasticsearch.index.mapper.ObjectMapper;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryRewriteContext;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.index.query.QueryShardException;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.MultiValueMode;
+import org.elasticsearch.search.SearchSortValuesAndFormats;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 
+import static org.elasticsearch.index.mapper.DateFieldMapper.Resolution.MILLISECONDS;
+import static org.elasticsearch.index.mapper.DateFieldMapper.Resolution.NANOSECONDS;
 import static org.elasticsearch.index.search.NestedHelper.parentObject;
 import static org.elasticsearch.search.sort.NestedSortBuilder.NESTED_FIELD;
 
@@ -64,6 +71,12 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
      * special field name to sort by index order
      */
     public static final String DOC_FIELD_NAME = "_doc";
+
+    /**
+     * special field name to sort by index order
+     */
+    public static final String SHARD_DOC_FIELD_NAME = ShardDocSortField.NAME;
+
     private static final SortFieldAndFormat SORT_DOC = new SortFieldAndFormat(
             new SortField(null, SortField.Type.DOC), DocValueFormat.RAW);
     private static final SortFieldAndFormat SORT_DOC_REVERSE = new SortFieldAndFormat(
@@ -241,7 +254,7 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
      * Specifying a numeric type tells Elasticsearch what type the sort values should
      * have, which is important for cross-index search, if a field does not have
      * the same type on all indices.
-     * Allowed values are <code>long</code> and <code>double</code>.
+     * Allowed values are <code>long</code>, <code>double</code>, <code>date</code> and <code>date_nanos</code>.
      */
     public FieldSortBuilder setNumericType(String numericType) {
         String lowerCase = numericType.toLowerCase(Locale.ENGLISH);
@@ -303,40 +316,19 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
     }
 
     @Override
-    public SortFieldAndFormat build(QueryShardContext context) throws IOException {
+    public SortFieldAndFormat build(SearchExecutionContext context) throws IOException {
+        final boolean reverse = order == SortOrder.DESC;
+
         if (DOC_FIELD_NAME.equals(fieldName)) {
-            return order == SortOrder.DESC ? SORT_DOC_REVERSE : SORT_DOC;
+            return reverse ? SORT_DOC_REVERSE : SORT_DOC;
+        } else if (SHARD_DOC_FIELD_NAME.equals(fieldName)) {
+            return new SortFieldAndFormat(new ShardDocSortField(context.getShardRequestIndex(), reverse), DocValueFormat.RAW);
         }
 
-        boolean isUnmapped = false;
-        MappedFieldType fieldType = context.fieldMapper(fieldName);
+        MappedFieldType fieldType = context.getFieldType(fieldName);
+        Nested nested = nested(context, fieldType);
         if (fieldType == null) {
-            isUnmapped = true;
-            if (unmappedType != null) {
-                fieldType = context.getMapperService().unmappedFieldType(unmappedType);
-            } else {
-                throw new QueryShardException(context, "No mapping found for [" + fieldName + "] in order to sort on");
-            }
-        }
-
-        MultiValueMode localSortMode = null;
-        if (sortMode != null) {
-            localSortMode = MultiValueMode.fromString(sortMode.toString());
-        }
-
-        boolean reverse = (order == SortOrder.DESC);
-        if (localSortMode == null) {
-            localSortMode = reverse ? MultiValueMode.MAX : MultiValueMode.MIN;
-        }
-
-        Nested nested = null;
-        if (isUnmapped == false) {
-            if (nestedSort != null) {
-                validateMaxChildrenExistOnlyInTopLevelNestedSort(context, nestedSort);
-                nested = resolveNested(context, nestedSort);
-            } else {
-                validateMissingNestedPath(context, fieldName);
-            }
+            fieldType = resolveUnmappedType(context);
         }
 
         IndexFieldData<?> fieldData = context.getForField(fieldType);
@@ -345,24 +337,244 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
             throw new QueryShardException(context, "we only support AVG, MEDIAN and SUM on number based fields");
         }
         final SortField field;
+        boolean isNanosecond = false;
         if (numericType != null) {
             if (fieldData instanceof IndexNumericFieldData == false) {
                 throw new QueryShardException(context,
                     "[numeric_type] option cannot be set on a non-numeric field, got " + fieldType.typeName());
             }
-            SortedNumericDVIndexFieldData numericFieldData = (SortedNumericDVIndexFieldData) fieldData;
+            IndexNumericFieldData numericFieldData = (IndexNumericFieldData) fieldData;
             NumericType resolvedType = resolveNumericType(numericType);
-            field = numericFieldData.sortField(resolvedType, missing, localSortMode, nested, reverse);
+            field = numericFieldData.sortField(resolvedType, missing, localSortMode(), nested, reverse);
+            isNanosecond = resolvedType == NumericType.DATE_NANOSECONDS;
         } else {
-            field = fieldData.sortField(missing, localSortMode, nested, reverse);
+            field = fieldData.sortField(missing, localSortMode(), nested, reverse);
+            if (fieldData instanceof IndexNumericFieldData) {
+                isNanosecond = ((IndexNumericFieldData) fieldData).getNumericType() == NumericType.DATE_NANOSECONDS;
+            }
         }
-        return new SortFieldAndFormat(field, fieldType.docValueFormat(null, null));
+        DocValueFormat format = fieldType.docValueFormat(null, null);
+        if (isNanosecond) {
+            format = DocValueFormat.withNanosecondResolution(format);
+        }
+        return new SortFieldAndFormat(field, format);
+    }
+
+    public boolean canRewriteToMatchNone() {
+        return nestedSort == null && (missing == null || "_last".equals(missing));
+    }
+
+    /**
+     * Returns whether some values of the given {@link SearchExecutionContext#getIndexReader()} are within the
+     * primary sort value provided in the <code>bottomSortValues</code>.
+     */
+    public boolean isBottomSortShardDisjoint(SearchExecutionContext context,
+                                             SearchSortValuesAndFormats bottomSortValues) throws IOException {
+        if (bottomSortValues == null || bottomSortValues.getRawSortValues().length == 0) {
+            return false;
+        }
+
+        if (canRewriteToMatchNone() == false) {
+            return false;
+        }
+        MappedFieldType fieldType = context.getFieldType(fieldName);
+        if (fieldType == null) {
+            // unmapped
+            return false;
+        }
+        if (fieldType.isSearchable() == false) {
+            return false;
+        }
+        DocValueFormat docValueFormat = bottomSortValues.getSortValueFormats()[0];
+        final DateMathParser dateMathParser;
+        if (docValueFormat instanceof DocValueFormat.DateTime) {
+            dateMathParser = ((DocValueFormat.DateTime) docValueFormat).getDateMathParser();
+        } else {
+            dateMathParser = null;
+        }
+        Object bottomSortValue =  bottomSortValues.getFormattedSortValues()[0];
+        Object minValue = order() == SortOrder.DESC ? bottomSortValue : null;
+        Object maxValue = order() == SortOrder.DESC ? null : bottomSortValue;
+        try {
+            MappedFieldType.Relation relation = fieldType.isFieldWithinQuery(context.getIndexReader(), minValue, maxValue,
+                true, true, null, dateMathParser, context);
+            return relation == MappedFieldType.Relation.DISJOINT;
+        } catch (ElasticsearchParseException exc) {
+            // can happen if the sort field is mapped differently in another search index
+            return false;
+        }
+    }
+
+    @Override
+    public BucketedSort buildBucketedSort(SearchExecutionContext context, BigArrays bigArrays, int bucketSize, BucketedSort.ExtraData extra)
+        throws IOException {
+        if (DOC_FIELD_NAME.equals(fieldName)) {
+            throw new IllegalArgumentException("sorting by _doc is not supported");
+        }
+
+        MappedFieldType fieldType = context.getFieldType(fieldName);
+        Nested nested = nested(context, fieldType);
+        if (fieldType == null) {
+            fieldType = resolveUnmappedType(context);
+        }
+
+        IndexFieldData<?> fieldData = context.getForField(fieldType);
+        if (fieldData instanceof IndexNumericFieldData == false
+                && (sortMode == SortMode.SUM || sortMode == SortMode.AVG || sortMode == SortMode.MEDIAN)) {
+            throw new QueryShardException(context, "we only support AVG, MEDIAN and SUM on number based fields");
+        }
+        if (numericType != null) {
+            if (fieldData instanceof IndexNumericFieldData == false) {
+                throw new QueryShardException(context,
+                    "[numeric_type] option cannot be set on a non-numeric field, got " + fieldType.typeName());
+            }
+            IndexNumericFieldData numericFieldData = (IndexNumericFieldData) fieldData;
+            NumericType resolvedType = resolveNumericType(numericType);
+            return numericFieldData.newBucketedSort(resolvedType, bigArrays, missing, localSortMode(), nested, order,
+                    fieldType.docValueFormat(null, null), bucketSize, extra);
+        }
+        try {
+            return fieldData.newBucketedSort(bigArrays, missing, localSortMode(), nested, order,
+                    fieldType.docValueFormat(null, null), bucketSize, extra);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("error building sort for field [" + fieldName + "] of type ["
+                    + fieldType.typeName() + "] in index [" + context.index().getName() + "]: " + e.getMessage(), e);
+        }
+    }
+
+    private MappedFieldType resolveUnmappedType(SearchExecutionContext context) {
+        if (unmappedType == null) {
+            throw new QueryShardException(context, "No mapping found for [" + fieldName + "] in order to sort on");
+        }
+        return context.buildAnonymousFieldType(unmappedType);
+    }
+
+    private MultiValueMode localSortMode() {
+        if (sortMode != null) {
+            return MultiValueMode.fromString(sortMode.toString());
+        }
+
+        return order == SortOrder.DESC ? MultiValueMode.MAX : MultiValueMode.MIN;
+    }
+
+    private Nested nested(SearchExecutionContext context, MappedFieldType fieldType) throws IOException {
+        if (fieldType == null) {
+            return null;
+        }
+        if (nestedSort == null) {
+            validateMissingNestedPath(context, fieldName);
+            return null;
+        }
+        validateMaxChildrenExistOnlyInTopLevelNestedSort(context, nestedSort);
+        return resolveNested(context, nestedSort);
+    }
+
+    /**
+     * Return true if the primary sort in the provided <code>source</code>
+     * is an instance of {@link FieldSortBuilder}.
+     */
+    public static boolean hasPrimaryFieldSort(SearchSourceBuilder source) {
+        return getPrimaryFieldSortOrNull(source) != null;
+    }
+
+    /**
+     * Return the {@link FieldSortBuilder} if the primary sort in the provided <code>source</code>
+     * is an instance of this class, null otherwise.
+     */
+    public static FieldSortBuilder getPrimaryFieldSortOrNull(SearchSourceBuilder source) {
+        if (source == null || source.sorts() == null || source.sorts().isEmpty()) {
+            return null;
+        }
+        return source.sorts().get(0) instanceof FieldSortBuilder ? (FieldSortBuilder) source.sorts().get(0) : null;
+    }
+
+    /**
+     * Return the {@link MinAndMax} indexed value from the provided {@link FieldSortBuilder} or <code>null</code> if unknown.
+     * The value can be extracted on non-nested indexed mapped fields of type keyword, numeric or date, other fields
+     * and configurations return <code>null</code>.
+     */
+    public static MinAndMax<?> getMinMaxOrNull(SearchExecutionContext context, FieldSortBuilder sortBuilder) throws IOException {
+        SortAndFormats sort = SortBuilder.buildSort(Collections.singletonList(sortBuilder), context).get();
+        SortField sortField = sort.sort.getSort()[0];
+        if (sortField.getField() == null) {
+            return null;
+        }
+        IndexReader reader = context.getIndexReader();
+        MappedFieldType fieldType = context.getFieldType(sortField.getField());
+        if (reader == null || (fieldType == null || fieldType.isSearchable() == false)) {
+            return null;
+        }
+        switch (IndexSortConfig.getSortFieldType(sortField)) {
+            case LONG:
+            case INT:
+            case DOUBLE:
+            case FLOAT:
+                return extractNumericMinAndMax(reader, sortField, fieldType, sortBuilder);
+            case STRING:
+            case STRING_VAL:
+                if (fieldType instanceof KeywordFieldMapper.KeywordFieldType) {
+                    Terms terms = MultiTerms.getTerms(reader, fieldType.name());
+                    if (terms == null) {
+                        return null;
+                    }
+                    return terms.getMin() != null ? new MinAndMax<>(terms.getMin(), terms.getMax()) : null;
+                }
+                break;
+        }
+        return null;
+    }
+
+    private static MinAndMax<?> extractNumericMinAndMax(IndexReader reader,
+                                                        SortField sortField,
+                                                        MappedFieldType fieldType,
+                                                        FieldSortBuilder sortBuilder) throws IOException {
+        String fieldName = fieldType.name();
+        if (PointValues.size(reader, fieldName) == 0) {
+            return null;
+        }
+        if (fieldType instanceof NumberFieldType) {
+            NumberFieldType numberFieldType = (NumberFieldType) fieldType;
+            Number minPoint = numberFieldType.parsePoint(PointValues.getMinPackedValue(reader, fieldName));
+            Number maxPoint = numberFieldType.parsePoint(PointValues.getMaxPackedValue(reader, fieldName));
+            switch (IndexSortConfig.getSortFieldType(sortField)) {
+                case LONG:
+                    return new MinAndMax<>(minPoint.longValue(), maxPoint.longValue());
+                case INT:
+                    return new MinAndMax<>(minPoint.intValue(), maxPoint.intValue());
+                case DOUBLE:
+                    return new MinAndMax<>(minPoint.doubleValue(), maxPoint.doubleValue());
+                case FLOAT:
+                    return new MinAndMax<>(minPoint.floatValue(), maxPoint.floatValue());
+                default:
+                    return null;
+            }
+        } else if (fieldType instanceof DateFieldType) {
+            DateFieldType dateFieldType = (DateFieldType) fieldType;
+            Function<byte[], Long> dateConverter = createDateConverter(sortBuilder, dateFieldType);
+            Long min = dateConverter.apply(PointValues.getMinPackedValue(reader, fieldName));
+            Long max = dateConverter.apply(PointValues.getMaxPackedValue(reader, fieldName));
+            return new MinAndMax<>(min, max);
+        }
+        return null;
+    }
+
+    private static Function<byte[], Long> createDateConverter(FieldSortBuilder sortBuilder, DateFieldType dateFieldType) {
+        String numericTypeStr = sortBuilder.getNumericType();
+        if (numericTypeStr != null) {
+            NumericType numericType = resolveNumericType(numericTypeStr);
+            if (dateFieldType.resolution() == MILLISECONDS && numericType == NumericType.DATE_NANOSECONDS) {
+                return v -> DateUtils.toNanoSeconds(LongPoint.decodeDimension(v, 0));
+            } else if (dateFieldType.resolution() == NANOSECONDS && numericType == NumericType.DATE) {
+                return v -> DateUtils.toMilliSeconds(LongPoint.decodeDimension(v, 0));
+            }
+        }
+        return v -> LongPoint.decodeDimension(v, 0);
     }
 
     /**
      * Throws an exception if max children is not located at top level nested sort.
      */
-    static void validateMaxChildrenExistOnlyInTopLevelNestedSort(QueryShardContext context, NestedSortBuilder nestedSort) {
+    static void validateMaxChildrenExistOnlyInTopLevelNestedSort(SearchExecutionContext context, NestedSortBuilder nestedSort) {
         for (NestedSortBuilder child = nestedSort.getNestedSort(); child != null; child = child.getNestedSort()) {
             if (child.getMaxChildren() != Integer.MAX_VALUE) {
                 throw new QueryShardException(context,
@@ -374,7 +586,7 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
     /**
      * Throws an exception if the provided <code>field</code> requires a nested context.
      */
-    static void validateMissingNestedPath(QueryShardContext context, String field) {
+    static void validateMissingNestedPath(SearchExecutionContext context, String field) {
         ObjectMapper contextMapper = context.nestedScope().getObjectMapper();
         if (contextMapper != null && contextMapper.nested().isNested() == false) {
             // already in nested context
@@ -437,15 +649,15 @@ public class FieldSortBuilder extends SortBuilder<FieldSortBuilder> {
         return PARSER.parse(parser, new FieldSortBuilder(fieldName), null);
     }
 
-    private static ObjectParser<FieldSortBuilder, Void> PARSER = new ObjectParser<>(NAME);
+    private static final ObjectParser<FieldSortBuilder, Void> PARSER = new ObjectParser<>(NAME);
 
     static {
-        PARSER.declareField(FieldSortBuilder::missing, p -> p.objectText(),  MISSING, ValueType.VALUE);
+        PARSER.declareField(FieldSortBuilder::missing, XContentParser::objectText,  MISSING, ValueType.VALUE);
         PARSER.declareString(FieldSortBuilder::unmappedType , UNMAPPED_TYPE);
         PARSER.declareString((b, v) -> b.order(SortOrder.fromString(v)) , ORDER_FIELD);
         PARSER.declareString((b, v) -> b.sortMode(SortMode.fromString(v)), SORT_MODE);
         PARSER.declareObject(FieldSortBuilder::setNestedSort, (p, c) -> NestedSortBuilder.fromXContent(p), NESTED_FIELD);
-        PARSER.declareString((b, v) -> b.setNumericType(v), NUMERIC_TYPE);
+        PARSER.declareString(FieldSortBuilder::setNumericType, NUMERIC_TYPE);
     }
 
     @Override

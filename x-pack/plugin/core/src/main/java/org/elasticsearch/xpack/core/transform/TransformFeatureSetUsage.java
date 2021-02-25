@@ -1,12 +1,14 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.core.transform;
 
-import org.elasticsearch.cluster.metadata.MetaData;
+import org.elasticsearch.Version;
+import org.elasticsearch.cluster.metadata.Metadata;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -30,11 +32,16 @@ public class TransformFeatureSetUsage extends Usage {
         this.accumulatedStats = new TransformIndexerStats(in);
     }
 
-    public TransformFeatureSetUsage(boolean available, boolean enabled, Map<String, Long> transformCountByState,
+    public TransformFeatureSetUsage(Map<String, Long> transformCountByState,
             TransformIndexerStats accumulatedStats) {
-        super(XPackField.TRANSFORM, available, enabled);
+        super(XPackField.TRANSFORM, true, true);
         this.transformCountByState = Objects.requireNonNull(transformCountByState);
         this.accumulatedStats = Objects.requireNonNull(accumulatedStats);
+    }
+
+    @Override
+    public Version getMinimalSupportedVersion() {
+        return Version.V_7_5_0;
     }
 
     @Override
@@ -54,7 +61,7 @@ public class TransformFeatureSetUsage extends Usage {
                 builder.field(entry.getKey(), entry.getValue());
                 all+=entry.getValue();
             }
-            builder.field(MetaData.ALL, all);
+            builder.field(Metadata.ALL, all);
             builder.endObject();
 
             // if there are no transforms, do not show any stats

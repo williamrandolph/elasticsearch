@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 package org.elasticsearch.action.support.master;
 
@@ -43,8 +32,11 @@ import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.discovery.MasterNotDiscoveredException;
+import org.elasticsearch.node.NodeClosedException;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.test.ESTestCase;
@@ -171,24 +163,14 @@ public class TransportMasterNodeActionTests extends ESTestCase {
         Action(String actionName, TransportService transportService, ClusterService clusterService,
                ThreadPool threadPool) {
             super(actionName, transportService, clusterService, threadPool,
-                    new ActionFilters(new HashSet<>()), Request::new, new IndexNameExpressionResolver());
+                    new ActionFilters(new HashSet<>()), Request::new, new IndexNameExpressionResolver(new ThreadContext(Settings.EMPTY)),
+                    Response::new, ThreadPool.Names.SAME);
         }
 
         @Override
         protected void doExecute(Task task, final Request request, ActionListener<Response> listener) {
             // remove unneeded threading by wrapping listener with SAME to prevent super.doExecute from wrapping it with LISTENER
             super.doExecute(task, request, new ThreadedActionListener<>(logger, threadPool, ThreadPool.Names.SAME, listener, false));
-        }
-
-        @Override
-        protected String executor() {
-            // very lightweight operation in memory, no need to fork to a thread
-            return ThreadPool.Names.SAME;
-        }
-
-        @Override
-        protected Response read(StreamInput in) throws IOException {
-            return new Response(in);
         }
 
         @Override
@@ -375,8 +357,11 @@ public class TransportMasterNodeActionTests extends ESTestCase {
         boolean rejoinSameMaster = failsWithConnectTransportException && randomBoolean();
         Request request = new Request().masterNodeTimeout(TimeValue.timeValueSeconds(failsWithConnectTransportException ? 60 : 0));
         DiscoveryNode masterNode = this.remoteNode;
-        setState(clusterService, ClusterState.builder(ClusterStateCreationUtils.state(localNode, masterNode, allNodes))
-            .version(randomIntBetween(0, 10))); // use a random base version so it can go down when simulating a restart.
+        setState(
+            clusterService,
+            // use a random base version so it can go down when simulating a restart.
+            ClusterState.builder(ClusterStateCreationUtils.state(localNode, masterNode, allNodes)).version(randomIntBetween(0, 10))
+        );
 
         PlainActionFuture<Response> listener = new PlainActionFuture<>();
         ActionTestUtils.execute(new Action("internal:testAction", transportService, clusterService, threadPool), null, request, listener);
@@ -389,7 +374,8 @@ public class TransportMasterNodeActionTests extends ESTestCase {
         assertThat(capturedRequest.action, equalTo("internal:testAction"));
 
         if (rejoinSameMaster) {
-            transport.handleRemoteError(capturedRequest.requestId, new ConnectTransportException(masterNode, "Fake error"));
+            transport.handleRemoteError(capturedRequest.requestId,
+                randomBoolean() ? new ConnectTransportException(masterNode, "Fake error") : new NodeClosedException(masterNode));
             assertFalse(listener.isDone());
             if (randomBoolean()) {
                 // simulate master node removal

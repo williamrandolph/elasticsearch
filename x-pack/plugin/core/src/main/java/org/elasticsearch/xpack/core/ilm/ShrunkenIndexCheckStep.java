@@ -1,14 +1,15 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.ilm;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.xcontent.ConstructingObjectParser;
@@ -25,7 +26,7 @@ import java.util.Objects;
  */
 public class ShrunkenIndexCheckStep extends ClusterStateWaitStep {
     public static final String NAME = "is-shrunken-index";
-    private static final Logger logger = LogManager.getLogger(InitializePolicyContextStep.class);
+    private static final Logger logger = LogManager.getLogger(ShrunkenIndexCheckStep.class);
     private String shrunkIndexPrefix;
 
     public ShrunkenIndexCheckStep(StepKey key, StepKey nextStepKey, String shrunkIndexPrefix) {
@@ -39,19 +40,19 @@ public class ShrunkenIndexCheckStep extends ClusterStateWaitStep {
 
     @Override
     public Result isConditionMet(Index index, ClusterState clusterState) {
-        IndexMetaData idxMeta = clusterState.getMetaData().index(index);
+        IndexMetadata idxMeta = clusterState.getMetadata().index(index);
         if (idxMeta == null) {
             logger.debug("[{}] lifecycle action for index [{}] executed but index no longer exists", getKey().getAction(), index.getName());
             // Index must have been since deleted, ignore it
             return new Result(false, null);
         }
-        String shrunkenIndexSource = IndexMetaData.INDEX_RESIZE_SOURCE_NAME.get(
-            clusterState.metaData().index(index).getSettings());
+        String shrunkenIndexSource = IndexMetadata.INDEX_RESIZE_SOURCE_NAME.get(
+            clusterState.metadata().index(index).getSettings());
         if (Strings.isNullOrEmpty(shrunkenIndexSource)) {
             throw new IllegalStateException("step[" + NAME + "] is checking an un-shrunken index[" + index.getName() + "]");
         }
         boolean isConditionMet = index.getName().equals(shrunkIndexPrefix + shrunkenIndexSource) &&
-                clusterState.metaData().index(shrunkenIndexSource) == null;
+                clusterState.metadata().index(shrunkenIndexSource) == null;
         if (isConditionMet) {
             return new Result(true, null);
         } else {

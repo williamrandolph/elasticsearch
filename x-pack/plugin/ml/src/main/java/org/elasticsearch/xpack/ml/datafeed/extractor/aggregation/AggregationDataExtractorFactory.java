@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.ml.datafeed.extractor.aggregation;
 
@@ -50,7 +51,9 @@ public class AggregationDataExtractorFactory implements DataExtractorFactory {
                 Intervals.alignToCeil(start, histogramInterval),
                 Intervals.alignToFloor(end, histogramInterval),
                 job.getAnalysisConfig().getSummaryCountFieldName().equals(DatafeedConfig.DOC_COUNT),
-                datafeedConfig.getHeaders());
+                datafeedConfig.getHeaders(),
+                datafeedConfig.getIndicesOptions(),
+                datafeedConfig.getRuntimeMappings());
         return new AggregationDataExtractor(client, dataExtractorContext, timingStatsReporter);
     }
 }

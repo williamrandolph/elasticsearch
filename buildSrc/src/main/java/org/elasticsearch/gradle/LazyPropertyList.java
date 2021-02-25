@@ -1,3 +1,10 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
+ */
 package org.elasticsearch.gradle;
 
 import org.gradle.api.tasks.Input;
@@ -170,11 +177,21 @@ public class LazyPropertyList<T> extends AbstractLazyPropertyCollection implemen
     }
 
     @Override
-    public List<? extends Object> getNormalizedCollection() {
+    public List<? extends PropertyListEntry<T>> getNormalizedCollection() {
         return delegate.stream()
             .peek(this::validate)
             .filter(entry -> entry.getNormalization() != PropertyNormalization.IGNORE_VALUE)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Return a "flattened" collection. This should be used when the collection type is itself a complex type with properties
+     * annotated as Gradle inputs rather than a simple type like {@link String}.
+     *
+     * @return a flattened collection filtered according to normalization strategy
+     */
+    public List<? extends T> getFlatNormalizedCollection() {
+        return getNormalizedCollection().stream().map(PropertyListEntry::getValue).collect(Collectors.toList());
     }
 
     private void validate(PropertyListEntry<T> entry) {
@@ -190,6 +207,7 @@ public class LazyPropertyList<T> extends AbstractLazyPropertyCollection implemen
             this.normalization = normalization;
         }
 
+        @Input
         public PropertyNormalization getNormalization() {
             return normalization;
         }

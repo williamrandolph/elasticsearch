@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.apache.lucene.queries;
@@ -145,25 +134,31 @@ public final class BinaryDocValuesRangeQuery extends Query {
         INTERSECTS {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
-                // part of the other range must touch this range
-                // this:    |---------------|
-                // other:               |------|
+                /*
+                 * part of the other range must touch this range
+                 * this:    |---------------|
+                 * other:               |------|
+                 */
                 return from.compareTo(otherTo) <= 0 && to.compareTo(otherFrom) >= 0;
             }
         }, WITHIN {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
-                // other range must entirely lie within this range
-                // this:    |---------------|
-                // other:       |------|
+                /*
+                 * other range must entirely lie within this range
+                 * this:    |---------------|
+                 * other:       |------|
+                 */
                 return from.compareTo(otherFrom) <= 0 && to.compareTo(otherTo) >= 0;
             }
         }, CONTAINS {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
-                // this and other range must overlap
-                // this:       |------|
-                // other:    |---------------|
+                /*
+                 * this and other range must overlap
+                 * this:       |------|
+                 * other:    |---------------|
+                 */
                 return from.compareTo(otherFrom) >= 0 && to.compareTo(otherTo) <= 0;
             }
         }, CROSSES {

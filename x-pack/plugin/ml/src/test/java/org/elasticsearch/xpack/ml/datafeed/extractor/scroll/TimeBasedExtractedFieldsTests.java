@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.ml.datafeed.extractor.scroll;
 
@@ -15,7 +16,12 @@ import org.elasticsearch.xpack.core.ml.job.config.AnalysisConfig;
 import org.elasticsearch.xpack.core.ml.job.config.DataDescription;
 import org.elasticsearch.xpack.core.ml.job.config.Detector;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
+import org.elasticsearch.xpack.ml.extractor.DocValueField;
 import org.elasticsearch.xpack.ml.extractor.ExtractedField;
+import org.elasticsearch.xpack.ml.extractor.ExtractedFields;
+import org.elasticsearch.xpack.ml.extractor.ScriptField;
+import org.elasticsearch.xpack.ml.extractor.SourceField;
+import org.elasticsearch.xpack.ml.extractor.TimeField;
 import org.elasticsearch.xpack.ml.test.SearchHitBuilder;
 
 import java.util.Arrays;
@@ -30,8 +36,7 @@ import static org.mockito.Mockito.when;
 
 public class TimeBasedExtractedFieldsTests extends ESTestCase {
 
-    private ExtractedField timeField = ExtractedField.newTimeField("time", Collections.singleton("date"),
-        ExtractedField.ExtractionMethod.DOC_VALUE);
+    private ExtractedField timeField = new TimeField("time", ExtractedField.Method.DOC_VALUE);
 
     public void testInvalidConstruction() {
         expectThrows(IllegalArgumentException.class, () -> new TimeBasedExtractedFields(timeField, Collections.emptyList()));
@@ -48,18 +53,12 @@ public class TimeBasedExtractedFieldsTests extends ESTestCase {
     }
 
     public void testAllTypesOfFields() {
-        ExtractedField docValue1 = ExtractedField.newField("doc1", Collections.singleton("keyword"),
-            ExtractedField.ExtractionMethod.DOC_VALUE);
-        ExtractedField docValue2 = ExtractedField.newField("doc2", Collections.singleton("float"),
-            ExtractedField.ExtractionMethod.DOC_VALUE);
-        ExtractedField scriptField1 = ExtractedField.newField("scripted1", Collections.emptySet(),
-            ExtractedField.ExtractionMethod.SCRIPT_FIELD);
-        ExtractedField scriptField2 = ExtractedField.newField("scripted2", Collections.emptySet(),
-            ExtractedField.ExtractionMethod.SCRIPT_FIELD);
-        ExtractedField sourceField1 = ExtractedField.newField("src1", Collections.singleton("text"),
-            ExtractedField.ExtractionMethod.SOURCE);
-        ExtractedField sourceField2 = ExtractedField.newField("src2", Collections.singleton("text"),
-            ExtractedField.ExtractionMethod.SOURCE);
+        ExtractedField docValue1 = new DocValueField("doc1", Collections.singleton("keyword"));
+        ExtractedField docValue2 = new DocValueField("doc2", Collections.singleton("float"));
+        ExtractedField scriptField1 = new ScriptField("scripted1");
+        ExtractedField scriptField2 = new ScriptField("scripted2");
+        ExtractedField sourceField1 = new SourceField("src1", Collections.singleton("text"));
+        ExtractedField sourceField2 = new SourceField("src2", Collections.singleton("text"));
         TimeBasedExtractedFields extractedFields = new TimeBasedExtractedFields(timeField, Arrays.asList(timeField,
                 docValue1, docValue2, scriptField1, scriptField2, sourceField1, sourceField2));
 
@@ -182,12 +181,9 @@ public class TimeBasedExtractedFieldsTests extends ESTestCase {
         assertThat(extractedFields.getSourceFields()[0], equalTo("airline"));
         assertThat(extractedFields.getAllFields().size(), equalTo(3));
 
-        assertThat(extractedFields.getAllFields().stream().filter(f -> f.getName().equals("time")).findFirst().get().getAlias(),
-                equalTo("time"));
-        assertThat(extractedFields.getAllFields().stream().filter(f -> f.getName().equals("airport.keyword")).findFirst().get().getAlias(),
-                equalTo("airport.keyword"));
-        assertThat(extractedFields.getAllFields().stream().filter(f -> f.getName().equals("airline")).findFirst().get().getAlias(),
-                equalTo("airline.text"));
+        assertThat(findField("time", extractedFields).getSearchField(), equalTo("time"));
+        assertThat(findField("airport.keyword", extractedFields).getSearchField(), equalTo("airport.keyword"));
+        assertThat(findField("airline.text", extractedFields).getSearchField(), equalTo("airline"));
     }
 
     public void testBuildGivenTimeFieldIsNotAggregatable() {
@@ -252,5 +248,9 @@ public class TimeBasedExtractedFieldsTests extends ESTestCase {
         FieldCapabilities fieldCaps = mock(FieldCapabilities.class);
         when(fieldCaps.isAggregatable()).thenReturn(isAggregatable);
         return fieldCaps;
+    }
+
+    private static ExtractedField findField(String name, ExtractedFields fields) {
+        return fields.getAllFields().stream().filter(f -> f.getName().equals(name)).findFirst().get();
     }
 }

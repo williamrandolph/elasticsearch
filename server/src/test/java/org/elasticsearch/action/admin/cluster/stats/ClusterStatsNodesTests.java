@@ -1,26 +1,16 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.action.admin.cluster.stats;
 
 import org.elasticsearch.action.admin.cluster.node.info.NodeInfo;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
+import org.elasticsearch.action.admin.cluster.node.stats.NodeStatsTests;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.common.network.NetworkModule;
 import org.elasticsearch.common.settings.Settings;
@@ -37,7 +27,6 @@ import java.util.TreeMap;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.elasticsearch.action.admin.cluster.node.stats.NodeStatsTests.createNodeStats;
 import static org.elasticsearch.common.xcontent.XContentHelper.toXContent;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -67,14 +56,26 @@ public class ClusterStatsNodesTests extends ESTestCase {
         + "}", toXContent(stats, XContentType.JSON, randomBoolean()).utf8ToString());
     }
 
-    @AwaitsFix(bugUrl = "https://github.com/elastic/elasticsearch/issues/48684")
     public void testIngestStats() throws Exception {
-        NodeStats nodeStats = createNodeStats();
-
+        NodeStats nodeStats = randomValueOtherThanMany(n -> n.getIngestStats() == null, NodeStatsTests::createNodeStats);
         SortedMap<String, long[]> processorStats = new TreeMap<>();
-        nodeStats.getIngestStats().getProcessorStats().values().forEach(l -> l.forEach(s -> processorStats.put(s.getType(),
-            new long[] { s.getStats().getIngestCount(), s.getStats().getIngestFailedCount(),
-                s.getStats().getIngestCurrent(), s.getStats().getIngestTimeInMillis()})));
+        nodeStats.getIngestStats().getProcessorStats().values().forEach(stats -> {
+            stats.forEach(stat -> {
+                processorStats.compute(stat.getType(), (key, value) -> {
+                    if (value == null) {
+                        return new long[] { stat.getStats().getIngestCount(), stat.getStats().getIngestFailedCount(),
+                            stat.getStats().getIngestCurrent(), stat.getStats().getIngestTimeInMillis()};
+                    } else {
+                        value[0] += stat.getStats().getIngestCount();
+                        value[1] += stat.getStats().getIngestFailedCount();
+                        value[2] += stat.getStats().getIngestCurrent();
+                        value[3] += stat.getStats().getIngestTimeInMillis();
+                        return value;
+                    }
+                });
+            });
+        });
+
         ClusterStatsNodes.IngestStats stats = new ClusterStatsNodes.IngestStats(Collections.singletonList(nodeStats));
         assertThat(stats.pipelineCount, equalTo(nodeStats.getIngestStats().getProcessorStats().size()));
         String processorStatsString = "{";
@@ -115,6 +116,6 @@ public class ClusterStatsNodesTests extends ESTestCase {
         }
         return new NodeInfo(null, null,
                 new DiscoveryNode(nodeId, buildNewFakeTransportAddress(), null),
-                settings.build(), null, null, null, null, null, null, null, null, null);
+                settings.build(), null, null, null, null, null, null, null, null, null, null);
     }
 }

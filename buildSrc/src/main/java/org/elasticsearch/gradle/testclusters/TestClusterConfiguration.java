@@ -1,38 +1,28 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 package org.elasticsearch.gradle.testclusters;
 
 import org.elasticsearch.gradle.FileSupplier;
 import org.elasticsearch.gradle.PropertyNormalization;
+import org.gradle.api.file.RegularFile;
 import org.gradle.api.logging.Logging;
+import org.gradle.api.provider.Provider;
 import org.slf4j.Logger;
 
 import java.io.File;
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-
 
 public interface TestClusterConfiguration {
 
@@ -42,11 +32,13 @@ public interface TestClusterConfiguration {
 
     void setTestDistribution(TestDistribution distribution);
 
-    void plugin(URI plugin);
+    void plugin(Provider<RegularFile> plugin);
 
-    void plugin(File plugin);
+    void plugin(String pluginProjectPath);
 
-    void module(File module);
+    void module(Provider<RegularFile> module);
+
+    void module(String moduleProjectPath);
 
     void keystore(String key, String value);
 
@@ -57,6 +49,10 @@ public interface TestClusterConfiguration {
     void keystore(String key, File value, PropertyNormalization normalization);
 
     void keystore(String key, FileSupplier valueSupplier);
+
+    void keystorePassword(String password);
+
+    void cliSetup(String binTool, CharSequence... args);
 
     void setting(String key, String value);
 
@@ -80,9 +76,11 @@ public interface TestClusterConfiguration {
 
     void jvmArgs(String... values);
 
-    void freeze();
+    boolean isPreserveDataDir();
 
-    void setJavaHome(File javaHome);
+    void setPreserveDataDir(boolean preserveDataDir);
+
+    void freeze();
 
     void start();
 
@@ -91,6 +89,8 @@ public interface TestClusterConfiguration {
     void extraConfigFile(String destination, File from);
 
     void extraConfigFile(String destination, File from, PropertyNormalization normalization);
+
+    void extraJarFile(File from);
 
     void user(Map<String, String> userSpec);
 
@@ -109,7 +109,8 @@ public interface TestClusterConfiguration {
     default void waitForConditions(
         LinkedHashMap<String, Predicate<TestClusterConfiguration>> waitConditions,
         long startedAtMillis,
-        long nodeUpTimeout, TimeUnit nodeUpTimeoutUnit,
+        long nodeUpTimeout,
+        TimeUnit nodeUpTimeoutUnit,
         TestClusterConfiguration context
     ) {
         Logger logger = Logging.getLogger(TestClusterConfiguration.class);
@@ -117,17 +118,13 @@ public interface TestClusterConfiguration {
             long thisConditionStartedAt = System.currentTimeMillis();
             boolean conditionMet = false;
             Throwable lastException = null;
-            while (
-                System.currentTimeMillis() - startedAtMillis < TimeUnit.MILLISECONDS.convert(nodeUpTimeout, nodeUpTimeoutUnit)
-            ) {
+            while (System.currentTimeMillis() - startedAtMillis < TimeUnit.MILLISECONDS.convert(nodeUpTimeout, nodeUpTimeoutUnit)) {
                 if (context.isProcessAlive() == false) {
-                    throw new TestClustersException(
-                        "process was found dead while waiting for " + description + ", " + this
-                    );
+                    throw new TestClustersException("process was found dead while waiting for " + description + ", " + this);
                 }
 
                 try {
-                    if(predicate.test(context)) {
+                    if (predicate.test(context)) {
                         conditionMet = true;
                         break;
                     }
@@ -138,8 +135,14 @@ public interface TestClusterConfiguration {
                 }
             }
             if (conditionMet == false) {
-                String message = "`" + context + "` failed to wait for " + description + " after " +
-                    nodeUpTimeout + " " + nodeUpTimeoutUnit;
+                String message = String.format(
+                    Locale.ROOT,
+                    "`%s` failed to wait for %s after %d %s",
+                    context,
+                    description,
+                    nodeUpTimeout,
+                    nodeUpTimeoutUnit
+                );
                 if (lastException == null) {
                     throw new TestClustersException(message);
                 } else {
@@ -156,18 +159,12 @@ public interface TestClusterConfiguration {
                     throw new TestClustersException(message + extraCause, lastException);
                 }
             }
-            logger.info(
-                "{}: {} took {} seconds",
-                this,  description,
-                (System.currentTimeMillis() - thisConditionStartedAt) / 1000.0
-            );
+            logger.info("{}: {} took {} seconds", this, description, (System.currentTimeMillis() - thisConditionStartedAt) / 1000.0);
         });
     }
 
     default String safeName(String name) {
-        return name
-            .replaceAll("^[^a-zA-Z0-9]+", "")
-            .replaceAll("[^a-zA-Z0-9\\.]+", "-");
+        return name.replaceAll("^[^a-zA-Z0-9]+", "").replaceAll("[^a-zA-Z0-9\\.]+", "-");
     }
 
     boolean isProcessAlive();

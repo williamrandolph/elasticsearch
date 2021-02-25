@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.sql.execution.search.extractor;
 
@@ -20,11 +21,11 @@ import org.elasticsearch.search.aggregations.metrics.InternalStats;
 import org.elasticsearch.search.aggregations.metrics.InternalSum;
 import org.elasticsearch.search.aggregations.metrics.InternalTDigestPercentileRanks;
 import org.elasticsearch.search.aggregations.metrics.InternalTDigestPercentiles;
+import org.elasticsearch.xpack.ql.execution.search.extractor.BucketExtractor;
 import org.elasticsearch.xpack.sql.SqlIllegalArgumentException;
 import org.elasticsearch.xpack.sql.common.io.SqlStreamInput;
 import org.elasticsearch.xpack.sql.querydsl.agg.Aggs;
 import org.elasticsearch.xpack.sql.util.DateUtils;
-
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class MetricAggExtractor implements BucketExtractor {
         this.name = name;
         this.property = property;
         this.innerKey = innerKey;
-        this. isDateTimeBased =isDateTimeBased;
+        this.isDateTimeBased = isDateTimeBased;
         this.zoneId = zoneId;
     }
 
@@ -96,7 +97,7 @@ public class MetricAggExtractor implements BucketExtractor {
             throw new SqlIllegalArgumentException("Cannot find an aggregation named {}", name);
         }
 
-        if (!containsValues(agg)) {
+        if (containsValues(agg) == false) {
             return null;
         }
 
@@ -109,6 +110,8 @@ public class MetricAggExtractor implements BucketExtractor {
         } else if (agg instanceof InternalFilter) {
             // COUNT(expr) and COUNT(ALL expr) uses this type of aggregation to account for non-null values only
             return ((InternalFilter) agg).getDocCount();
+        } else if (agg instanceof InternalCardinality) {
+            return ((InternalCardinality) agg).getValue();
         }
 
         Object v = agg.getProperty(property);
@@ -120,7 +123,7 @@ public class MetricAggExtractor implements BucketExtractor {
             if (object == null) {
                 return object;
             } else if (object instanceof Number) {
-                return DateUtils.asDateTime(((Number) object).longValue(), zoneId);
+                return DateUtils.asDateTimeWithMillis(((Number) object).longValue(), zoneId);
             } else {
                 throw new SqlIllegalArgumentException("Invalid date key returned: {}", object);
             }
@@ -148,9 +151,6 @@ public class MetricAggExtractor implements BucketExtractor {
         }
         if (agg instanceof InternalAvg) {
             return hasValue((InternalAvg) agg);
-        }
-        if (agg instanceof InternalCardinality) {
-            return hasValue((InternalCardinality) agg);
         }
         if (agg instanceof InternalSum) {
             return hasValue((InternalSum) agg);

@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.action.util;
 
@@ -67,7 +68,13 @@ public final class QueryPage<T extends ToXContent & Writeable> implements ToXCon
 
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
         builder.field(COUNT.getPreferredName(), count);
-        builder.field(resultsField.getPreferredName(), results);
+        builder.startArray(resultsField.getPreferredName());
+        for (T result : results) {
+            if (result != null) {
+                result.toXContent(builder, params);
+            }
+        }
+        builder.endArray();
         return builder;
     }
 

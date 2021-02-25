@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.geometry;
@@ -36,27 +25,27 @@ public class PolygonTests extends BaseGeometryTestCase<Polygon> {
 
     public void testBasicSerialization() throws IOException, ParseException {
         WellKnownText wkt = new WellKnownText(true, new GeographyValidator(true));
-        assertEquals("polygon ((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0))",
+        assertEquals("POLYGON ((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0))",
             wkt.toWKT(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}))));
         assertEquals(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1})),
-            wkt.fromWKT("polygon ((3 1, 4 2, 5 3, 3 1))"));
+            wkt.fromWKT("POLYGON ((3 1, 4 2, 5 3, 3 1))"));
 
-        assertEquals("polygon ((3.0 1.0 5.0, 4.0 2.0 4.0, 5.0 3.0 3.0, 3.0 1.0 5.0))",
+        assertEquals("POLYGON ((3.0 1.0 5.0, 4.0 2.0 4.0, 5.0 3.0 3.0, 3.0 1.0 5.0))",
             wkt.toWKT(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}, new double[]{5, 4, 3, 5}))));
         assertEquals(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}, new double[]{5, 4, 3, 5})),
-            wkt.fromWKT("polygon ((3 1 5, 4 2 4, 5 3 3, 3 1 5))"));
+            wkt.fromWKT("POLYGON ((3 1 5, 4 2 4, 5 3 3, 3 1 5))"));
 
         // Auto closing in coerce mode
         assertEquals(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1})),
-            wkt.fromWKT("polygon ((3 1, 4 2, 5 3))"));
+            wkt.fromWKT("POLYGON ((3 1, 4 2, 5 3))"));
         assertEquals(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}, new double[]{5, 4, 3, 5})),
-            wkt.fromWKT("polygon ((3 1 5, 4 2 4, 5 3 3))"));
+            wkt.fromWKT("POLYGON ((3 1 5, 4 2 4, 5 3 3))"));
         assertEquals(new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}),
             Collections.singletonList(new LinearRing(new double[]{0.5, 2.5, 2.0, 0.5}, new double[]{1.5, 1.5, 1.0, 1.5}))),
-            wkt.fromWKT("polygon ((3 1, 4 2, 5 3, 3 1), (0.5 1.5, 2.5 1.5, 2.0 1.0))"));
+            wkt.fromWKT("POLYGON ((3 1, 4 2, 5 3, 3 1), (0.5 1.5, 2.5 1.5, 2.0 1.0))"));
 
-        assertEquals("polygon EMPTY", wkt.toWKT(Polygon.EMPTY));
-        assertEquals(Polygon.EMPTY, wkt.fromWKT("polygon EMPTY)"));
+        assertEquals("POLYGON EMPTY", wkt.toWKT(Polygon.EMPTY));
+        assertEquals(Polygon.EMPTY, wkt.fromWKT("POLYGON EMPTY)"));
     }
 
     public void testInitValidation() {

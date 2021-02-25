@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.ilm;
 
@@ -37,12 +38,12 @@ public class ShrunkShardsAllocatedStep extends ClusterStateWaitStep {
     public Result isConditionMet(Index index, ClusterState clusterState) {
         // We only want to make progress if all shards of the shrunk index are
         // active
-        boolean indexExists = clusterState.metaData().index(shrunkIndexPrefix + index.getName()) != null;
+        boolean indexExists = clusterState.metadata().index(shrunkIndexPrefix + index.getName()) != null;
         if (indexExists == false) {
             return new Result(false, new Info(false, -1, false));
         }
         boolean allShardsActive = ActiveShardCount.ALL.enoughShardsActive(clusterState, shrunkIndexPrefix + index.getName());
-        int numShrunkIndexShards = clusterState.metaData().index(shrunkIndexPrefix + index.getName()).getNumberOfShards();
+        int numShrunkIndexShards = clusterState.metadata().index(shrunkIndexPrefix + index.getName()).getNumberOfShards();
         if (allShardsActive) {
             return new Result(true, null);
         } else {

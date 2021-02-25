@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.ml.datafeed.extractor.aggregation;
 
@@ -74,7 +75,9 @@ public class RollupDataExtractorFactory implements DataExtractorFactory {
             Intervals.alignToCeil(start, histogramInterval),
             Intervals.alignToFloor(end, histogramInterval),
             job.getAnalysisConfig().getSummaryCountFieldName().equals(DatafeedConfig.DOC_COUNT),
-            datafeedConfig.getHeaders());
+            datafeedConfig.getHeaders(),
+            datafeedConfig.getIndicesOptions(),
+            datafeedConfig.getRuntimeMappings());
         return new RollupDataExtractor(client, dataExtractorContext, timingStatsReporter);
     }
 
@@ -85,6 +88,13 @@ public class RollupDataExtractorFactory implements DataExtractorFactory {
                               NamedXContentRegistry xContentRegistry,
                               DatafeedTimingStatsReporter timingStatsReporter,
                               ActionListener<DataExtractorFactory> listener) {
+
+        if (datafeed.getRuntimeMappings().isEmpty() == false) {
+            // TODO Rollup V2 will support runtime fields
+            listener.onFailure(new IllegalArgumentException("The datafeed has runtime_mappings defined, "
+                + "runtime fields are not supported in rollup searches"));
+            return;
+        }
 
         final AggregationBuilder datafeedHistogramAggregation = getHistogramAggregation(
             datafeed.getParsedAggregations(xContentRegistry).getAggregatorFactories());
@@ -117,7 +127,7 @@ public class RollupDataExtractorFactory implements DataExtractorFactory {
             );
             return;
         }
-        final List<ValuesSourceAggregationBuilder<?, ?>> flattenedAggs = new ArrayList<>();
+        final List<ValuesSourceAggregationBuilder<?>> flattenedAggs = new ArrayList<>();
         flattenAggregations(datafeed.getParsedAggregations(xContentRegistry)
             .getAggregatorFactories(), datafeedHistogramAggregation, flattenedAggs);
 
@@ -148,7 +158,7 @@ public class RollupDataExtractorFactory implements DataExtractorFactory {
 
     private static void flattenAggregations(final Collection<AggregationBuilder> datafeedAggregations,
                                             final AggregationBuilder datafeedHistogramAggregation,
-                                            final List<ValuesSourceAggregationBuilder<?, ?>> flattenedAggregations) {
+                                            final List<ValuesSourceAggregationBuilder<?>> flattenedAggregations) {
         for (AggregationBuilder aggregationBuilder : datafeedAggregations) {
             if (aggregationBuilder.equals(datafeedHistogramAggregation) == false) {
                 flattenedAggregations.add((ValuesSourceAggregationBuilder)aggregationBuilder);
@@ -157,8 +167,8 @@ public class RollupDataExtractorFactory implements DataExtractorFactory {
         }
     }
 
-    private static boolean hasAggregations(ParsedRollupCaps rollupCaps, List<ValuesSourceAggregationBuilder<?,?>> datafeedAggregations) {
-        for (ValuesSourceAggregationBuilder<?,?> aggregationBuilder : datafeedAggregations) {
+    private static boolean hasAggregations(ParsedRollupCaps rollupCaps, List<ValuesSourceAggregationBuilder<?>> datafeedAggregations) {
+        for (ValuesSourceAggregationBuilder<?> aggregationBuilder : datafeedAggregations) {
             String type = aggregationBuilder.getType();
             String field = aggregationBuilder.field();
             if (aggregationBuilder instanceof TermsAggregationBuilder) {

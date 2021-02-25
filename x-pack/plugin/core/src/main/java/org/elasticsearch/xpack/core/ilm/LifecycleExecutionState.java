@@ -1,13 +1,16 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.core.ilm;
 
 import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.Strings;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +37,10 @@ public class LifecycleExecutionState {
     private static final String FAILED_STEP_RETRY_COUNT = "failed_step_retry_count";
     private static final String STEP_INFO = "step_info";
     private static final String PHASE_DEFINITION = "phase_definition";
+    private static final String SNAPSHOT_NAME = "snapshot_name";
+    private static final String SNAPSHOT_REPOSITORY = "snapshot_repository";
+    private static final String SNAPSHOT_INDEX_NAME = "snapshot_index_name";
+    private static final String ROLLUP_INDEX_NAME = "rollup_index_name";
 
     private final String phase;
     private final String action;
@@ -47,10 +54,15 @@ public class LifecycleExecutionState {
     private final Long phaseTime;
     private final Long actionTime;
     private final Long stepTime;
+    private final String snapshotName;
+    private final String snapshotRepository;
+    private final String snapshotIndexName;
+    private final String rollupIndexName;
 
     private LifecycleExecutionState(String phase, String action, String step, String failedStep, Boolean isAutoRetryableError,
                                     Integer failedStepRetryCount, String stepInfo, String phaseDefinition, Long lifecycleDate,
-                                    Long phaseTime, Long actionTime, Long stepTime) {
+                                    Long phaseTime, Long actionTime, Long stepTime, String snapshotRepository, String snapshotName,
+                                    String snapshotIndexName, String rollupIndexName) {
         this.phase = phase;
         this.action = action;
         this.step = step;
@@ -63,19 +75,48 @@ public class LifecycleExecutionState {
         this.phaseTime = phaseTime;
         this.actionTime = actionTime;
         this.stepTime = stepTime;
+        this.snapshotRepository = snapshotRepository;
+        this.snapshotName = snapshotName;
+        this.snapshotIndexName = snapshotIndexName;
+        this.rollupIndexName = rollupIndexName;
     }
 
     /**
-     * Retrieves the execution state from an {@link IndexMetaData} based on the
+     * Retrieves the execution state from an {@link IndexMetadata} based on the
      * custom metadata.
-     * @param indexMetaData The metadata of the index to retrieve the execution
+     * @param indexMetadata The metadata of the index to retrieve the execution
      *                      state from.
      * @return The execution state of that index.
      */
-    public static LifecycleExecutionState fromIndexMetadata(IndexMetaData indexMetaData) {
-        Map<String, String> customData = indexMetaData.getCustomData(ILM_CUSTOM_METADATA_KEY);
+    public static LifecycleExecutionState fromIndexMetadata(IndexMetadata indexMetadata) {
+        Map<String, String> customData = indexMetadata.getCustomData(ILM_CUSTOM_METADATA_KEY);
         customData = customData == null ? new HashMap<>() : customData;
         return fromCustomMetadata(customData);
+    }
+
+    /**
+     * Retrieves the current {@link Step.StepKey} from the lifecycle state. Note that
+     * it is illegal for the step to be set with the phase and/or action unset,
+     * or for the step to be unset with the phase and/or action set. All three
+     * settings must be either present or missing.
+     *
+     * @param lifecycleState the index custom data to extract the {@link Step.StepKey} from.
+     */
+    @Nullable
+    public static Step.StepKey getCurrentStepKey(LifecycleExecutionState lifecycleState) {
+        Objects.requireNonNull(lifecycleState, "cannot determine current step key as lifecycle state is null");
+        String currentPhase = lifecycleState.getPhase();
+        String currentAction = lifecycleState.getAction();
+        String currentStep = lifecycleState.getStep();
+        if (Strings.isNullOrEmpty(currentStep)) {
+            assert Strings.isNullOrEmpty(currentPhase) : "Current phase is not empty: " + currentPhase;
+            assert Strings.isNullOrEmpty(currentAction) : "Current action is not empty: " + currentAction;
+            return null;
+        } else {
+            assert Strings.isNullOrEmpty(currentPhase) == false;
+            assert Strings.isNullOrEmpty(currentAction) == false;
+            return new Step.StepKey(currentPhase, currentAction, currentStep);
+        }
     }
 
     public static Builder builder() {
@@ -95,6 +136,10 @@ public class LifecycleExecutionState {
             .setIndexCreationDate(state.lifecycleDate)
             .setPhaseTime(state.phaseTime)
             .setActionTime(state.actionTime)
+            .setSnapshotRepository(state.snapshotRepository)
+            .setSnapshotName(state.snapshotName)
+            .setSnapshotIndexName(state.snapshotIndexName)
+            .setRollupIndexName(state.rollupIndexName)
             .setStepTime(state.stepTime);
     }
 
@@ -123,6 +168,12 @@ public class LifecycleExecutionState {
         }
         if (customData.containsKey(PHASE_DEFINITION)) {
             builder.setPhaseDefinition(customData.get(PHASE_DEFINITION));
+        }
+        if (customData.containsKey(SNAPSHOT_REPOSITORY)) {
+            builder.setSnapshotRepository(customData.get(SNAPSHOT_REPOSITORY));
+        }
+        if (customData.containsKey(SNAPSHOT_NAME)) {
+            builder.setSnapshotName(customData.get(SNAPSHOT_NAME));
         }
         if (customData.containsKey(INDEX_CREATION_DATE)) {
             try {
@@ -156,12 +207,18 @@ public class LifecycleExecutionState {
                     e, STEP_TIME, customData.get(STEP_TIME));
             }
         }
+        if (customData.containsKey(SNAPSHOT_INDEX_NAME)) {
+            builder.setSnapshotIndexName(customData.get(SNAPSHOT_INDEX_NAME));
+        }
+        if (customData.containsKey(ROLLUP_INDEX_NAME)) {
+            builder.setRollupIndexName(customData.get(ROLLUP_INDEX_NAME));
+        }
         return builder.build();
     }
 
     /**
      * Converts this object to an immutable map representation for use with
-     * {@link IndexMetaData.Builder#putCustom(String, Map)}.
+     * {@link IndexMetadata.Builder#putCustom(String, Map)}.
      * @return An immutable Map representation of this execution state.
      */
     public Map<String, String> asMap() {
@@ -201,6 +258,18 @@ public class LifecycleExecutionState {
         }
         if (phaseDefinition != null) {
             result.put(PHASE_DEFINITION, String.valueOf(phaseDefinition));
+        }
+        if (snapshotRepository != null) {
+            result.put(SNAPSHOT_REPOSITORY, snapshotRepository);
+        }
+        if (snapshotName != null) {
+            result.put(SNAPSHOT_NAME, snapshotName);
+        }
+        if (snapshotIndexName != null) {
+            result.put(SNAPSHOT_INDEX_NAME, snapshotIndexName);
+        }
+        if (rollupIndexName != null) {
+            result.put(ROLLUP_INDEX_NAME, rollupIndexName);
         }
         return Collections.unmodifiableMap(result);
     }
@@ -253,6 +322,22 @@ public class LifecycleExecutionState {
         return stepTime;
     }
 
+    public String getSnapshotName() {
+        return snapshotName;
+    }
+
+    public String getSnapshotRepository() {
+        return snapshotRepository;
+    }
+
+    public String getSnapshotIndexName() {
+        return snapshotIndexName;
+    }
+
+    public String getRollupIndexName() {
+        return rollupIndexName;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -269,13 +354,22 @@ public class LifecycleExecutionState {
             Objects.equals(isAutoRetryableError(), that.isAutoRetryableError()) &&
             Objects.equals(getFailedStepRetryCount(), that.getFailedStepRetryCount()) &&
             Objects.equals(getStepInfo(), that.getStepInfo()) &&
+            Objects.equals(getSnapshotRepository(), that.getSnapshotRepository()) &&
+            Objects.equals(getSnapshotName(), that.getSnapshotName()) &&
+            Objects.equals(getSnapshotIndexName(), that.getSnapshotIndexName()) &&
             Objects.equals(getPhaseDefinition(), that.getPhaseDefinition());
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(getPhase(), getAction(), getStep(), getFailedStep(), isAutoRetryableError(), getFailedStepRetryCount(),
-            getStepInfo(), getPhaseDefinition(), getLifecycleDate(), getPhaseTime(), getActionTime(), getStepTime());
+            getStepInfo(), getPhaseDefinition(), getLifecycleDate(), getPhaseTime(), getActionTime(), getStepTime(),
+            getSnapshotRepository(), getSnapshotName(), getSnapshotIndexName());
+    }
+
+    @Override
+    public String toString() {
+        return asMap().toString();
     }
 
     public static class Builder {
@@ -291,6 +385,10 @@ public class LifecycleExecutionState {
         private Long stepTime;
         private Boolean isAutoRetryableError;
         private Integer failedStepRetryCount;
+        private String snapshotName;
+        private String snapshotRepository;
+        private String snapshotIndexName;
+        private String rollupIndexName;
 
         public Builder setPhase(String phase) {
             this.phase = phase;
@@ -352,9 +450,30 @@ public class LifecycleExecutionState {
             return this;
         }
 
+        public Builder setSnapshotRepository(String snapshotRepository) {
+            this.snapshotRepository = snapshotRepository;
+            return this;
+        }
+
+        public Builder setSnapshotName(String snapshotName) {
+            this.snapshotName = snapshotName;
+            return this;
+        }
+
+        public Builder setSnapshotIndexName(String snapshotIndexName) {
+            this.snapshotIndexName = snapshotIndexName;
+            return this;
+        }
+
+        public Builder setRollupIndexName(String rollupIndexName) {
+            this.rollupIndexName = rollupIndexName;
+            return this;
+        }
+
         public LifecycleExecutionState build() {
             return new LifecycleExecutionState(phase, action, step, failedStep, isAutoRetryableError, failedStepRetryCount, stepInfo,
-                phaseDefinition, indexCreationDate, phaseTime, actionTime, stepTime);
+                phaseDefinition, indexCreationDate, phaseTime, actionTime, stepTime, snapshotRepository, snapshotName,
+                snapshotIndexName, rollupIndexName);
         }
     }
 

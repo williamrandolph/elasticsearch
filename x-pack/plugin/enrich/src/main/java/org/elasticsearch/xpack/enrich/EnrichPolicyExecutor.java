@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.enrich;
@@ -43,14 +44,16 @@ public class EnrichPolicyExecutor {
     private final int maxForceMergeAttempts;
     private final Semaphore policyExecutionPermits;
 
-    public EnrichPolicyExecutor(Settings settings,
-                         ClusterService clusterService,
-                         Client client,
-                         TaskManager taskManager,
-                         ThreadPool threadPool,
-                         IndexNameExpressionResolver indexNameExpressionResolver,
-                         EnrichPolicyLocks policyLocks,
-                         LongSupplier nowSupplier) {
+    public EnrichPolicyExecutor(
+        Settings settings,
+        ClusterService clusterService,
+        Client client,
+        TaskManager taskManager,
+        ThreadPool threadPool,
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        EnrichPolicyLocks policyLocks,
+        LongSupplier nowSupplier
+    ) {
         this.clusterService = clusterService;
         this.client = client;
         this.taskManager = taskManager;
@@ -69,8 +72,14 @@ public class EnrichPolicyExecutor {
         if (policyExecutionPermits.tryAcquire() == false) {
             // Release policy lock, and throw a different exception
             policyLocks.releasePolicy(policyName);
-            throw new EsRejectedExecutionException("Policy execution failed. Policy execution for [" + policyName + "] would exceed " +
-                "maximum concurrent policy executions [" + maximumConcurrentPolicyExecutions + "]");
+            throw new EsRejectedExecutionException(
+                "Policy execution failed. Policy execution for ["
+                    + policyName
+                    + "] would exceed "
+                    + "maximum concurrent policy executions ["
+                    + maximumConcurrentPolicyExecutions
+                    + "]"
+            );
         }
     }
 
@@ -88,8 +97,12 @@ public class EnrichPolicyExecutor {
         private final BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse;
         private final BiConsumer<Task, Exception> onFailure;
 
-        PolicyCompletionListener(String policyName, ExecuteEnrichPolicyTask task,
-                                 BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse, BiConsumer<Task, Exception> onFailure) {
+        PolicyCompletionListener(
+            String policyName,
+            ExecuteEnrichPolicyTask task,
+            BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse,
+            BiConsumer<Task, Exception> onFailure
+        ) {
             this.policyName = policyName;
             this.task = task;
             this.onResponse = onResponse;
@@ -120,10 +133,24 @@ public class EnrichPolicyExecutor {
         }
     }
 
-    protected Runnable createPolicyRunner(String policyName, EnrichPolicy policy, ExecuteEnrichPolicyTask task,
-                                          ActionListener<ExecuteEnrichPolicyStatus> listener) {
-        return new EnrichPolicyRunner(policyName, policy, task, listener, clusterService, client, indexNameExpressionResolver, nowSupplier,
-            fetchSize, maxForceMergeAttempts);
+    protected Runnable createPolicyRunner(
+        String policyName,
+        EnrichPolicy policy,
+        ExecuteEnrichPolicyTask task,
+        ActionListener<ExecuteEnrichPolicyStatus> listener
+    ) {
+        return new EnrichPolicyRunner(
+            policyName,
+            policy,
+            task,
+            listener,
+            clusterService,
+            client,
+            indexNameExpressionResolver,
+            nowSupplier,
+            fetchSize,
+            maxForceMergeAttempts
+        );
     }
 
     private EnrichPolicy getPolicy(ExecuteEnrichPolicyAction.Request request) {
@@ -143,18 +170,28 @@ public class EnrichPolicyExecutor {
         return runPolicy(request, getPolicy(request), listener);
     }
 
-    public Task runPolicy(ExecuteEnrichPolicyAction.Request request, EnrichPolicy policy,
-                          ActionListener<ExecuteEnrichPolicyStatus> listener) {
+    public Task runPolicy(
+        ExecuteEnrichPolicyAction.Request request,
+        EnrichPolicy policy,
+        ActionListener<ExecuteEnrichPolicyStatus> listener
+    ) {
         return runPolicy(request, policy, (t, r) -> listener.onResponse(r), (t, e) -> listener.onFailure(e));
     }
 
-    public Task runPolicy(ExecuteEnrichPolicyAction.Request request, EnrichPolicy policy,
-                          TaskListener<ExecuteEnrichPolicyStatus> listener) {
+    public Task runPolicy(
+        ExecuteEnrichPolicyAction.Request request,
+        EnrichPolicy policy,
+        TaskListener<ExecuteEnrichPolicyStatus> listener
+    ) {
         return runPolicy(request, policy, listener::onResponse, listener::onFailure);
     }
 
-    private Task runPolicy(ExecuteEnrichPolicyAction.Request request, EnrichPolicy policy,
-                           BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse, BiConsumer<Task, Exception> onFailure) {
+    private Task runPolicy(
+        ExecuteEnrichPolicyAction.Request request,
+        EnrichPolicy policy,
+        BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse,
+        BiConsumer<Task, Exception> onFailure
+    ) {
         tryLockingPolicy(request.getName());
         try {
             return runPolicyTask(request, policy, onResponse, onFailure);
@@ -165,8 +202,12 @@ public class EnrichPolicyExecutor {
         }
     }
 
-    private Task runPolicyTask(final ExecuteEnrichPolicyAction.Request request, EnrichPolicy policy,
-                               BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse, BiConsumer<Task, Exception> onFailure) {
+    private Task runPolicyTask(
+        final ExecuteEnrichPolicyAction.Request request,
+        EnrichPolicy policy,
+        BiConsumer<Task, ExecuteEnrichPolicyStatus> onResponse,
+        BiConsumer<Task, Exception> onFailure
+    ) {
         Task asyncTask = taskManager.register("enrich", TASK_ACTION, new TaskAwareRequest() {
             @Override
             public void setParentTask(TaskId taskId) {

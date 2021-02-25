@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.monitoring.exporter;
 
@@ -17,12 +18,11 @@ import org.elasticsearch.xpack.core.template.TemplateUtils;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 public final class MonitoringTemplateUtils {
 
     private static final String TEMPLATE_FILE = "/monitoring-%s.json";
-    private static final String TEMPLATE_VERSION_PROPERTY = Pattern.quote("${monitoring.template.version}");
+    private static final String TEMPLATE_VERSION_PROPERTY = "monitoring.template.version";
 
     /**
      * The last version of X-Pack that updated the templates and pipelines.

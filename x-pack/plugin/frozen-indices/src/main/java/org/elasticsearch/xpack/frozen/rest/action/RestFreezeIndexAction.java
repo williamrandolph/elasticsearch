@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.frozen.rest.action;
 
@@ -11,16 +12,21 @@ import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.protocol.xpack.frozen.FreezeRequest;
 import org.elasticsearch.rest.BaseRestHandler;
-import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.action.RestToXContentListener;
 import org.elasticsearch.xpack.core.frozen.action.FreezeIndexAction;
 
+import java.util.List;
+
+import static org.elasticsearch.rest.RestRequest.Method.POST;
+
 public final class RestFreezeIndexAction extends BaseRestHandler {
 
-    public RestFreezeIndexAction(RestController controller) {
-        controller.registerHandler(RestRequest.Method.POST, "/{index}/_freeze", this);
-        controller.registerHandler(RestRequest.Method.POST, "/{index}/_unfreeze", this);
+    @Override
+    public List<Route> routes() {
+        return List.of(
+            new Route(POST, "/{index}/_freeze"),
+            new Route(POST, "/{index}/_unfreeze"));
     }
 
     @Override

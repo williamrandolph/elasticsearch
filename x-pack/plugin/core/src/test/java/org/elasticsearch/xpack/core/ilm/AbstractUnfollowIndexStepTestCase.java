@@ -1,13 +1,13 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.ilm;
 
 import org.elasticsearch.Version;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.mockito.Mockito;
 
 import static org.hamcrest.Matchers.is;
@@ -19,7 +19,7 @@ public abstract class AbstractUnfollowIndexStepTestCase<T extends AbstractUnfoll
     protected final T createRandomInstance() {
         Step.StepKey stepKey = randomStepKey();
         Step.StepKey nextStepKey = randomStepKey();
-        return newInstance(stepKey, nextStepKey, Mockito.mock(Client.class));
+        return newInstance(stepKey, nextStepKey);
     }
 
     @Override
@@ -33,23 +33,22 @@ public abstract class AbstractUnfollowIndexStepTestCase<T extends AbstractUnfoll
             nextKey = new Step.StepKey(key.getPhase(), key.getAction(), key.getName() + randomAlphaOfLength(5));
         }
 
-        return newInstance(key, nextKey, instance.getClient());
+        return newInstance(key, nextKey);
     }
 
     @Override
     protected final T copyInstance(T instance) {
-        return newInstance(instance.getKey(), instance.getNextStepKey(), instance.getClient());
+        return newInstance(instance.getKey(), instance.getNextStepKey());
     }
 
     public final void testNotAFollowerIndex() {
-        IndexMetaData indexMetadata = IndexMetaData.builder("follower-index")
+        IndexMetadata indexMetadata = IndexMetadata.builder("follower-index")
             .settings(settings(Version.CURRENT).put(LifecycleSettings.LIFECYCLE_INDEXING_COMPLETE, "true"))
             .numberOfShards(1)
             .numberOfReplicas(0)
             .build();
 
-        Client client = Mockito.mock(Client.class);
-        T step = newInstance(randomStepKey(), randomStepKey(), client);
+        T step = newInstance(randomStepKey(), randomStepKey());
 
         Boolean[] completed = new Boolean[1];
         Exception[] failure = new Exception[1];
@@ -69,5 +68,5 @@ public abstract class AbstractUnfollowIndexStepTestCase<T extends AbstractUnfoll
         Mockito.verifyZeroInteractions(client);
     }
 
-    protected abstract T newInstance(Step.StepKey key, Step.StepKey nextKey, Client client);
+    protected abstract T newInstance(Step.StepKey key, Step.StepKey nextKey);
 }

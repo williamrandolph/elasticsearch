@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.security.authc.oidc;
 
@@ -27,6 +28,7 @@ import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.BadJWTException;
 import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
@@ -86,14 +88,13 @@ import static org.mockito.Mockito.when;
 public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
 
     private OpenIdConnectAuthenticator authenticator;
-    private Settings globalSettings;
     private Environment env;
     private ThreadContext threadContext;
     private int callsToReloadJwk;
 
     @Before
     public void setup() {
-        globalSettings = Settings.builder().put("path.home", createTempDir())
+        final Settings globalSettings = Settings.builder().put("path.home", createTempDir())
             .put("xpack.security.authc.realms.oidc.oidc-realm.ssl.verification_mode", "certificate").build();
         env = TestEnvironment.newEnvironment(globalSettings);
         threadContext = new ThreadContext(globalSettings);
@@ -109,7 +110,7 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
 
     private OpenIdConnectAuthenticator buildAuthenticator() throws URISyntaxException {
         final RealmConfig config = buildConfig(getBasicRealmSettings().build(), threadContext);
-        return new OpenIdConnectAuthenticator(config, getOpConfig(), getDefaultRpConfig(), new SSLService(globalSettings, env), null);
+        return new OpenIdConnectAuthenticator(config, getOpConfig(), getDefaultRpConfig(), new SSLService(env), null);
     }
 
     private OpenIdConnectAuthenticator buildAuthenticator(OpenIdConnectProviderConfiguration opConfig, RelyingPartyConfiguration rpConfig,
@@ -117,7 +118,7 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
         final RealmConfig config = buildConfig(getBasicRealmSettings().build(), threadContext);
         final JWSVerificationKeySelector keySelector = new JWSVerificationKeySelector(rpConfig.getSignatureAlgorithm(), jwkSource);
         final IDTokenValidator validator = new IDTokenValidator(opConfig.getIssuer(), rpConfig.getClientId(), keySelector, null);
-        return new OpenIdConnectAuthenticator(config, opConfig, rpConfig, new SSLService(globalSettings, env), validator,
+        return new OpenIdConnectAuthenticator(config, opConfig, rpConfig, new SSLService(env), validator,
             null);
     }
 
@@ -126,7 +127,7 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
         final RealmConfig config = buildConfig(getBasicRealmSettings().build(), threadContext);
         final IDTokenValidator validator = new IDTokenValidator(opConfig.getIssuer(), rpConfig.getClientId(),
             rpConfig.getSignatureAlgorithm(), new Secret(rpConfig.getClientSecret().toString()));
-        return new OpenIdConnectAuthenticator(config, opConfig, rpConfig, new SSLService(globalSettings, env), validator,
+        return new OpenIdConnectAuthenticator(config, opConfig, rpConfig, new SSLService(env), validator,
             null);
     }
 
@@ -824,6 +825,51 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
         assertTrue(combinedAddress.containsKey("country"));
     }
 
+    public void testJsonObjectMergingWithBooleanLeniency() {
+        final JSONObject idTokenObject = new JWTClaimsSet.Builder()
+            .claim("email_verified", true)
+            .claim("email_verified_1", "true")
+            .claim("email_verified_2", false)
+            .claim("email_verified_3", "false")
+            .build()
+            .toJSONObject();
+        final JSONObject userInfoObject = new JWTClaimsSet.Builder()
+            .claim("email_verified", "true")
+            .claim("email_verified_1", true)
+            .claim("email_verified_2", "false")
+            .claim("email_verified_3", false)
+            .build()
+            .toJSONObject();
+        OpenIdConnectAuthenticator.mergeObjects(idTokenObject, userInfoObject);
+        assertSame(Boolean.TRUE, idTokenObject.get("email_verified"));
+        assertSame(Boolean.TRUE, idTokenObject.get("email_verified_1"));
+        assertSame(Boolean.FALSE, idTokenObject.get("email_verified_2"));
+        assertSame(Boolean.FALSE, idTokenObject.get("email_verified_3"));
+
+        final JSONObject idTokenObject1 = new JWTClaimsSet.Builder()
+            .claim("email_verified", true)
+            .build()
+            .toJSONObject();
+        final JSONObject userInfoObject1 = new JWTClaimsSet.Builder()
+            .claim("email_verified", "false")
+            .build()
+            .toJSONObject();
+        IllegalStateException e =
+            expectThrows(IllegalStateException.class, () -> OpenIdConnectAuthenticator.mergeObjects(idTokenObject1, userInfoObject1));
+        assertThat(e.getMessage(), containsString("Cannot merge [java.lang.Boolean] with [java.lang.String]"));
+
+        final JSONObject idTokenObject2 = new JWTClaimsSet.Builder()
+            .claim("email_verified", true)
+            .build()
+            .toJSONObject();
+        final JSONObject userInfoObject2 = new JWTClaimsSet.Builder()
+            .claim("email_verified", "yes")
+            .build()
+            .toJSONObject();
+        e = expectThrows(IllegalStateException.class, () -> OpenIdConnectAuthenticator.mergeObjects(idTokenObject2, userInfoObject2));
+        assertThat(e.getMessage(), containsString("Cannot merge [java.lang.Boolean] with [java.lang.String]"));
+    }
+
     private OpenIdConnectProviderConfiguration getOpConfig() throws URISyntaxException {
         return new OpenIdConnectProviderConfiguration(
             new Issuer("https://op.example.com"),
@@ -842,8 +888,11 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
             new ResponseType("id_token", "token"),
             new Scope("openid"),
             JWSAlgorithm.RS384,
+            ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+            JWSAlgorithm.HS384,
             new URI("https://rp.elastic.co/successfull_logout"));
     }
+
     private RelyingPartyConfiguration getRpConfig(String alg) throws URISyntaxException {
         return new RelyingPartyConfiguration(
             new ClientID("rp-my"),
@@ -852,6 +901,8 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
             new ResponseType("id_token", "token"),
             new Scope("openid"),
             JWSAlgorithm.parse(alg),
+            ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+            JWSAlgorithm.HS384,
             new URI("https://rp.elastic.co/successfull_logout"));
     }
 
@@ -863,6 +914,8 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
             new ResponseType("id_token"),
             new Scope("openid"),
             JWSAlgorithm.parse(alg),
+            ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+            JWSAlgorithm.HS384,
             new URI("https://rp.elastic.co/successfull_logout"));
     }
 
@@ -984,7 +1037,7 @@ public class OpenIdConnectAuthenticatorTests extends OpenIdConnectTestCase {
         } else {
             throw new IllegalArgumentException("Invalid key type :" + type);
         }
-        return new Tuple(key, new JWKSet(jwk));
+        return new Tuple<>(key, new JWKSet(jwk));
     }
 
     private Curve curveFromHashSize(int size) {

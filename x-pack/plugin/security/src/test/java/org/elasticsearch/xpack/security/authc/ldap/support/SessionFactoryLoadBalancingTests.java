@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.security.authc.ldap.support;
 
@@ -292,7 +293,7 @@ public class SessionFactoryLoadBalancingTests extends LdapTestCase {
         Settings globalSettings = Settings.builder().put("path.home", createTempDir()).put(settings).build();
         RealmConfig config = new RealmConfig(REALM_IDENTIFIER, globalSettings,
                 TestEnvironment.newEnvironment(globalSettings), new ThreadContext(Settings.EMPTY));
-        return new TestSessionFactory(config, new SSLService(Settings.EMPTY, TestEnvironment.newEnvironment(config.settings())),
+        return new TestSessionFactory(config, new SSLService(TestEnvironment.newEnvironment(config.settings())),
                 threadPool);
     }
 

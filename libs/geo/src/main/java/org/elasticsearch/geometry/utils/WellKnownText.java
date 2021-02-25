@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.geometry.utils;
@@ -433,7 +422,7 @@ public class WellKnownText {
     private void closeLinearRingIfCoerced(ArrayList<Double> lats, ArrayList<Double> lons, ArrayList<Double> alts) {
         if (coerce && lats.isEmpty() == false && lons.isEmpty() == false) {
             int last = lats.size() - 1;
-            if (!lats.get(0).equals(lats.get(last)) || !lons.get(0).equals(lons.get(last)) ||
+            if (lats.get(0).equals(lats.get(last)) == false || lons.get(0).equals(lons.get(last)) == false ||
                 (alts.isEmpty() == false && !alts.get(0).equals(alts.get(last)))) {
                 lons.add(lons.get(0));
                 lats.add(lats.get(0));
@@ -482,7 +471,7 @@ public class WellKnownText {
         double lat = nextNumber(stream);
         double radius = nextNumber(stream);
         double alt = Double.NaN;
-        if (isNumberNext(stream) == true) {
+        if (isNumberNext(stream)) {
             alt = nextNumber(stream);
         }
         Circle circle = new Circle(lon, lat, alt, radius);
@@ -560,7 +549,7 @@ public class WellKnownText {
     }
 
     private String nextComma(StreamTokenizer stream) throws IOException, ParseException {
-        if (nextWord(stream).equals(COMMA) == true) {
+        if (nextWord(stream).equals(COMMA)) {
             return COMMA;
         }
         throw new ParseException("expected " + COMMA + " but found: " + tokenString(stream), stream.lineno());
@@ -586,17 +575,17 @@ public class WellKnownText {
         return geometry.visit(new GeometryVisitor<String, RuntimeException>() {
             @Override
             public String visit(Circle circle) {
-                return "circle";
+                return "CIRCLE";
             }
 
             @Override
             public String visit(GeometryCollection<?> collection) {
-                return "geometrycollection";
+                return "GEOMETRYCOLLECTION";
             }
 
             @Override
             public String visit(Line line) {
-                return "linestring";
+                return "LINESTRING";
             }
 
             @Override
@@ -606,32 +595,32 @@ public class WellKnownText {
 
             @Override
             public String visit(MultiLine multiLine) {
-                return "multilinestring";
+                return "MULTILINESTRING";
             }
 
             @Override
             public String visit(MultiPoint multiPoint) {
-                return "multipoint";
+                return "MULTIPOINT";
             }
 
             @Override
             public String visit(MultiPolygon multiPolygon) {
-                return "multipolygon";
+                return "MULTIPOLYGON";
             }
 
             @Override
             public String visit(Point point) {
-                return "point";
+                return "POINT";
             }
 
             @Override
             public String visit(Polygon polygon) {
-                return "polygon";
+                return "POLYGON";
             }
 
             @Override
             public String visit(Rectangle rectangle) {
-                return "bbox";
+                return "BBOX";
             }
         });
     }

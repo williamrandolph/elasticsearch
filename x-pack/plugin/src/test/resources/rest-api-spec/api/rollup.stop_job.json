@@ -1,9 +1,14 @@
 {
   "rollup.stop_job":{
     "documentation":{
-      "url":""
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/master/rollup-stop-job.html",
+      "description":"Stops an existing, started rollup job."
     },
     "stability":"experimental",
+    "visibility":"public",
+    "headers":{
+      "accept": [ "application/json"]
+    },
     "url":{
       "paths":[
         {

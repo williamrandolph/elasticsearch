@@ -1,35 +1,34 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
+ */
 package org.elasticsearch.gradle.info;
 
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputDirectory;
-import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.PathSensitive;
-import org.gradle.api.tasks.PathSensitivity;
+import org.gradle.api.provider.Provider;
 
 import java.io.File;
 
 public class JavaHome {
     private Integer version;
-    private File javaHome;
+    private Provider<File> javaHome;
 
-    private JavaHome(int version, File javaHome) {
+    private JavaHome(int version, Provider<File> javaHome) {
         this.version = version;
         this.javaHome = javaHome;
     }
 
-    public static JavaHome of(int version, File javaHome) {
+    public static JavaHome of(int version, Provider<File> javaHome) {
         return new JavaHome(version, javaHome);
     }
 
-    @Input
     public Integer getVersion() {
         return version;
     }
 
-    @InputDirectory
-    @Optional
-    @PathSensitive(PathSensitivity.RELATIVE)
-    public File getJavaHome() {
+    public Provider<File> getJavaHome() {
         return javaHome;
     }
 }

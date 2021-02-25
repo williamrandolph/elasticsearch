@@ -1,9 +1,15 @@
 {
   "ml.get_influencers":{
     "documentation":{
-      "url":"http://www.elastic.co/guide/en/elasticsearch/reference/current/ml-get-influencer.html"
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-get-influencer.html",
+      "description":"Retrieves anomaly detection job results for one or more influencers."
     },
     "stability":"stable",
+    "visibility":"public",
+    "headers":{
+      "accept": [ "application/json"],
+      "content_type": ["application/json"]
+    },
     "url":{
       "paths":[
         {
@@ -14,7 +20,8 @@
           ],
           "parts":{
             "job_id":{
-              "type":"string"
+              "type":"string",
+              "description":"Identifier for the anomaly detection job"
             }
           }
         }

@@ -1,9 +1,15 @@
 {
   "sql.translate":{
     "documentation":{
-      "url":"Translate SQL into Elasticsearch queries"
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/current/sql-translate.html",
+      "description":"Translates SQL into Elasticsearch queries"
     },
     "stability":"stable",
+    "visibility":"public",
+    "headers":{
+      "accept": [ "application/json"],
+      "content_type": ["application/json"]
+    },
     "url":{
       "paths":[
         {

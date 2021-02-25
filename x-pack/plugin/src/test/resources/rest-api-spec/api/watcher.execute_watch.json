@@ -1,9 +1,15 @@
 {
   "watcher.execute_watch":{
     "documentation":{
-      "url":"http://www.elastic.co/guide/en/elasticsearch/reference/current/watcher-api-execute-watch.html"
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/current/watcher-api-execute-watch.html",
+      "description":"Forces the execution of a stored watch."
     },
     "stability":"stable",
+    "visibility":"public",
+    "headers":{
+      "accept": [ "application/json"],
+      "content_type": ["application/json"]
+    },
     "url":{
       "paths":[
         {

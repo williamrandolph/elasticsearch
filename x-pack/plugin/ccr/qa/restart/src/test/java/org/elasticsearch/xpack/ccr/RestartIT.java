@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.ccr;
@@ -10,7 +11,6 @@ import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.index.IndexSettings;
 
 import java.io.IOException;
 
@@ -71,9 +71,8 @@ public class RestartIT extends ESCCRRestTestCase {
     }
 
     private void createIndexAndIndexDocuments(final String index, final int numberOfDocuments, final RestClient client) throws IOException {
-        final Settings settings = Settings.builder().put(IndexSettings.INDEX_SOFT_DELETES_SETTING.getKey(), true).build();
         final Request createIndexRequest = new Request("PUT", "/" + index);
-        createIndexRequest.setJsonEntity("{\"settings\":" + Strings.toString(settings) + "}");
+        createIndexRequest.setJsonEntity("{\"settings\":" + Strings.toString(Settings.EMPTY) + "}");
         assertOK(client.performRequest(createIndexRequest));
         indexDocuments(index, numberOfDocuments, 0, client);
     }

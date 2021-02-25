@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.core.ilm;
 
@@ -11,47 +12,43 @@ import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.admin.indices.rollover.RolloverResponse;
 import org.elasticsearch.action.admin.indices.shrink.ResizeRequest;
 import org.elasticsearch.action.admin.indices.shrink.ResizeResponse;
-import org.elasticsearch.client.AdminClient;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.client.IndicesAdminClient;
-import org.elasticsearch.cluster.metadata.AliasMetaData;
-import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.AliasMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.xpack.core.ilm.AsyncActionStep.Listener;
 import org.elasticsearch.xpack.core.ilm.Step.StepKey;
-import org.junit.Before;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import java.util.Collections;
 
+import static org.elasticsearch.xpack.core.ilm.AbstractStepMasterTimeoutTestCase.emptyClusterState;
 import static org.elasticsearch.xpack.core.ilm.LifecycleExecutionState.ILM_CUSTOM_METADATA_KEY;
 import static org.hamcrest.Matchers.equalTo;
 
 public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
 
-    private Client client;
-
-    @Before
-    public void setup() {
-        client = Mockito.mock(Client.class);
-    }
-
     @Override
     public ShrinkStep createRandomInstance() {
         StepKey stepKey = randomStepKey();
         StepKey nextStepKey = randomStepKey();
-        int numberOfShards = randomIntBetween(1, 20);
+        Integer numberOfShards = null;
+        ByteSizeValue maxPrimaryShardSize = null;
+        if (randomBoolean()) {
+            numberOfShards = randomIntBetween(1, 20);
+        } else {
+            maxPrimaryShardSize = new ByteSizeValue(between(1,100));
+        }
         String shrunkIndexPrefix = randomAlphaOfLength(10);
-        return new ShrinkStep(stepKey, nextStepKey, client, numberOfShards, shrunkIndexPrefix);
+        return new ShrinkStep(stepKey, nextStepKey, client, numberOfShards, maxPrimaryShardSize, shrunkIndexPrefix);
     }
 
     @Override
     public ShrinkStep mutateInstance(ShrinkStep instance) {
         StepKey key = instance.getKey();
         StepKey nextKey = instance.getNextStepKey();
-        int numberOfShards = instance.getNumberOfShards();
+        Integer numberOfShards = instance.getNumberOfShards();
+        ByteSizeValue maxPrimaryShardSize = instance.getMaxPrimaryShardSize();
         String shrunkIndexPrefix = instance.getShrunkIndexPrefix();
 
         switch (between(0, 3)) {
@@ -62,7 +59,12 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
             nextKey = new StepKey(key.getPhase(), key.getAction(), key.getName() + randomAlphaOfLength(5));
             break;
         case 2:
-            numberOfShards = numberOfShards + 1;
+            if (numberOfShards != null) {
+                numberOfShards = numberOfShards + 1;
+            }
+            if (maxPrimaryShardSize != null) {
+                maxPrimaryShardSize = new ByteSizeValue(maxPrimaryShardSize.getBytes() + 1);
+            }
             break;
         case 3:
             shrunkIndexPrefix += randomAlphaOfLength(5);
@@ -71,13 +73,13 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
             throw new AssertionError("Illegal randomisation branch");
         }
 
-        return new ShrinkStep(key, nextKey, instance.getClient(), numberOfShards, shrunkIndexPrefix);
+        return new ShrinkStep(key, nextKey, instance.getClient(), numberOfShards, maxPrimaryShardSize, shrunkIndexPrefix);
     }
 
     @Override
     public ShrinkStep copyInstance(ShrinkStep instance) {
         return new ShrinkStep(instance.getKey(), instance.getNextStepKey(), instance.getClient(), instance.getNumberOfShards(),
-                instance.getShrunkIndexPrefix());
+            instance.getMaxPrimaryShardSize(), instance.getShrunkIndexPrefix());
     }
 
     public void testPerformAction() throws Exception {
@@ -88,46 +90,41 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
         lifecycleState.setAction(step.getKey().getAction());
         lifecycleState.setStep(step.getKey().getName());
         lifecycleState.setIndexCreationDate(randomNonNegativeLong());
-        IndexMetaData sourceIndexMetaData = IndexMetaData.builder(randomAlphaOfLength(10))
+        IndexMetadata sourceIndexMetadata = IndexMetadata.builder(randomAlphaOfLength(10))
             .settings(settings(Version.CURRENT)
                 .put(LifecycleSettings.LIFECYCLE_NAME, lifecycleName)
             )
             .putCustom(ILM_CUSTOM_METADATA_KEY, lifecycleState.build().asMap())
             .numberOfShards(randomIntBetween(1, 5)).numberOfReplicas(randomIntBetween(0, 5))
-            .putAlias(AliasMetaData.builder("my_alias"))
+            .putAlias(AliasMetadata.builder("my_alias"))
             .build();
 
+        Mockito.doAnswer(invocation -> {
+            ResizeRequest request = (ResizeRequest) invocation.getArguments()[0];
+            @SuppressWarnings("unchecked")
+            ActionListener<ResizeResponse> listener = (ActionListener<ResizeResponse>) invocation.getArguments()[1];
+            assertThat(request.getSourceIndex(), equalTo(sourceIndexMetadata.getIndex().getName()));
+            assertThat(request.getTargetIndexRequest().aliases(), equalTo(Collections.emptySet()));
 
-        AdminClient adminClient = Mockito.mock(AdminClient.class);
-        IndicesAdminClient indicesClient = Mockito.mock(IndicesAdminClient.class);
-
-        Mockito.when(client.admin()).thenReturn(adminClient);
-        Mockito.when(adminClient.indices()).thenReturn(indicesClient);
-        Mockito.doAnswer(new Answer<Void>() {
-
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                ResizeRequest request = (ResizeRequest) invocation.getArguments()[0];
-                @SuppressWarnings("unchecked")
-                ActionListener<ResizeResponse> listener = (ActionListener<ResizeResponse>) invocation.getArguments()[1];
-                assertThat(request.getSourceIndex(), equalTo(sourceIndexMetaData.getIndex().getName()));
-                assertThat(request.getTargetIndexRequest().aliases(), equalTo(Collections.emptySet()));
-                assertThat(request.getTargetIndexRequest().settings(), equalTo(Settings.builder()
-                    .put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, step.getNumberOfShards())
-                    .put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, sourceIndexMetaData.getNumberOfReplicas())
-                    .put(LifecycleSettings.LIFECYCLE_NAME, lifecycleName)
-                    .put(IndexMetaData.INDEX_ROUTING_REQUIRE_GROUP_SETTING.getKey() + "_id", (String) null)
-                    .build()));
-                assertThat(request.getTargetIndexRequest().settings()
-                        .getAsInt(IndexMetaData.SETTING_NUMBER_OF_SHARDS, -1), equalTo(step.getNumberOfShards()));
-                listener.onResponse(new ResizeResponse(true, true, sourceIndexMetaData.getIndex().getName()));
-                return null;
+            Settings.Builder builder = Settings.builder();
+            builder.put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, sourceIndexMetadata.getNumberOfReplicas())
+                .put(LifecycleSettings.LIFECYCLE_NAME, lifecycleName)
+                .put(IndexMetadata.INDEX_ROUTING_REQUIRE_GROUP_SETTING.getKey() + "_id", (String) null);
+            if (step.getNumberOfShards() != null) {
+                builder.put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, step.getNumberOfShards());
             }
-
+            assertThat(request.getTargetIndexRequest().settings(), equalTo(builder.build()));
+            if (step.getNumberOfShards() != null) {
+                assertThat(request.getTargetIndexRequest().settings()
+                    .getAsInt(IndexMetadata.SETTING_NUMBER_OF_SHARDS, -1), equalTo(step.getNumberOfShards()));
+            }
+            request.setMaxPrimaryShardSize(step.getMaxPrimaryShardSize());
+            listener.onResponse(new ResizeResponse(true, true, sourceIndexMetadata.getIndex().getName()));
+            return null;
         }).when(indicesClient).resizeIndex(Mockito.any(), Mockito.any());
 
         SetOnce<Boolean> actionCompleted = new SetOnce<>();
-        step.performAction(sourceIndexMetaData, null, null, new Listener() {
+        step.performAction(sourceIndexMetadata, emptyClusterState(), null, new Listener() {
 
             @Override
             public void onResponse(boolean complete) {
@@ -147,33 +144,23 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
         Mockito.verify(indicesClient, Mockito.only()).resizeIndex(Mockito.any(), Mockito.any());
     }
 
-    public void testPerformActionNotComplete() throws Exception {
+    public void testPerformActionIsCompleteForUnAckedRequests() throws Exception {
         LifecycleExecutionState.Builder lifecycleState = LifecycleExecutionState.builder();
         lifecycleState.setIndexCreationDate(randomNonNegativeLong());
-        IndexMetaData indexMetaData = IndexMetaData.builder(randomAlphaOfLength(10)).settings(settings(Version.CURRENT))
+        IndexMetadata indexMetadata = IndexMetadata.builder(randomAlphaOfLength(10)).settings(settings(Version.CURRENT))
             .putCustom(ILM_CUSTOM_METADATA_KEY, lifecycleState.build().asMap())
             .numberOfShards(randomIntBetween(1, 5)).numberOfReplicas(randomIntBetween(0, 5)).build();
         ShrinkStep step = createRandomInstance();
 
-        AdminClient adminClient = Mockito.mock(AdminClient.class);
-        IndicesAdminClient indicesClient = Mockito.mock(IndicesAdminClient.class);
-
-        Mockito.when(client.admin()).thenReturn(adminClient);
-        Mockito.when(adminClient.indices()).thenReturn(indicesClient);
-        Mockito.doAnswer(new Answer<Void>() {
-
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                @SuppressWarnings("unchecked")
-                ActionListener<ResizeResponse> listener = (ActionListener<ResizeResponse>) invocation.getArguments()[1];
-                listener.onResponse(new ResizeResponse(false, false, indexMetaData.getIndex().getName()));
-                return null;
-            }
-
+        Mockito.doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            ActionListener<ResizeResponse> listener = (ActionListener<ResizeResponse>) invocation.getArguments()[1];
+            listener.onResponse(new ResizeResponse(false, false, indexMetadata.getIndex().getName()));
+            return null;
         }).when(indicesClient).resizeIndex(Mockito.any(), Mockito.any());
 
         SetOnce<Boolean> actionCompleted = new SetOnce<>();
-        step.performAction(indexMetaData, null, null, new Listener() {
+        step.performAction(indexMetadata, emptyClusterState(), null, new Listener() {
 
             @Override
             public void onResponse(boolean complete) {
@@ -186,7 +173,7 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
             }
         });
 
-        assertEquals(false, actionCompleted.get());
+        assertEquals(true, actionCompleted.get());
 
         Mockito.verify(client, Mockito.only()).admin();
         Mockito.verify(adminClient, Mockito.only()).indices();
@@ -196,31 +183,21 @@ public class ShrinkStepTests extends AbstractStepTestCase<ShrinkStep> {
     public void testPerformActionFailure() throws Exception {
         LifecycleExecutionState.Builder lifecycleState = LifecycleExecutionState.builder();
         lifecycleState.setIndexCreationDate(randomNonNegativeLong());
-        IndexMetaData indexMetaData = IndexMetaData.builder(randomAlphaOfLength(10)).settings(settings(Version.CURRENT))
+        IndexMetadata indexMetadata = IndexMetadata.builder(randomAlphaOfLength(10)).settings(settings(Version.CURRENT))
             .putCustom(ILM_CUSTOM_METADATA_KEY, lifecycleState.build().asMap())
             .numberOfShards(randomIntBetween(1, 5)).numberOfReplicas(randomIntBetween(0, 5)).build();
         Exception exception = new RuntimeException();
         ShrinkStep step = createRandomInstance();
 
-        AdminClient adminClient = Mockito.mock(AdminClient.class);
-        IndicesAdminClient indicesClient = Mockito.mock(IndicesAdminClient.class);
-
-        Mockito.when(client.admin()).thenReturn(adminClient);
-        Mockito.when(adminClient.indices()).thenReturn(indicesClient);
-        Mockito.doAnswer(new Answer<Void>() {
-
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                @SuppressWarnings("unchecked")
-                ActionListener<RolloverResponse> listener = (ActionListener<RolloverResponse>) invocation.getArguments()[1];
-                listener.onFailure(exception);
-                return null;
-            }
-
+        Mockito.doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            ActionListener<RolloverResponse> listener = (ActionListener<RolloverResponse>) invocation.getArguments()[1];
+            listener.onFailure(exception);
+            return null;
         }).when(indicesClient).resizeIndex(Mockito.any(), Mockito.any());
 
         SetOnce<Boolean> exceptionThrown = new SetOnce<>();
-        step.performAction(indexMetaData, null, null, new Listener() {
+        step.performAction(indexMetadata, emptyClusterState(), null, new Listener() {
 
             @Override
             public void onResponse(boolean complete) {

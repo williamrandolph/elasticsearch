@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.rest.action.document;
@@ -30,7 +19,6 @@ import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.rest.BytesRestResponse;
 import org.elasticsearch.rest.RestChannel;
-import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestResponseListener;
@@ -38,6 +26,7 @@ import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 import static org.elasticsearch.rest.RestRequest.Method.HEAD;
@@ -48,9 +37,11 @@ import static org.elasticsearch.rest.RestStatus.OK;
  */
 public class RestGetSourceAction extends BaseRestHandler {
 
-    public RestGetSourceAction(final RestController controller) {
-        controller.registerHandler(GET, "/{index}/_source/{id}", this);
-        controller.registerHandler(HEAD, "/{index}/_source/{id}", this);
+    @Override
+    public List<Route> routes() {
+        return List.of(
+            new Route(GET, "/{index}/_source/{id}"),
+            new Route(HEAD, "/{index}/_source/{id}"));
     }
 
     @Override
@@ -69,7 +60,7 @@ public class RestGetSourceAction extends BaseRestHandler {
         getRequest.fetchSourceContext(FetchSourceContext.parseFromRestRequest(request));
 
         return channel -> {
-            if (getRequest.fetchSourceContext() != null && !getRequest.fetchSourceContext().fetchSource()) {
+            if (getRequest.fetchSourceContext() != null && getRequest.fetchSourceContext().fetchSource() == false) {
                 final ActionRequestValidationException validationError = new ActionRequestValidationException();
                 validationError.addValidationError("fetching source can not be disabled");
                 channel.sendResponse(new BytesRestResponse(channel, validationError));

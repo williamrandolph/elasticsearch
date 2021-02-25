@@ -1,9 +1,15 @@
 {
   "ccr.forget_follower":{
     "documentation":{
-      "url":"http://www.elastic.co/guide/en/elasticsearch/reference/current"
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/current/ccr-post-forget-follower.html",
+      "description": "Removes the follower retention leases from the leader."
     },
     "stability":"stable",
+    "visibility":"public",
+    "headers":{
+      "accept": [ "application/json"],
+      "content_type": ["application/json"]
+    },
     "url":{
       "paths":[
         {

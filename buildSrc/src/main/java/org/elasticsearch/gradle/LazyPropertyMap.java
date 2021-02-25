@@ -1,3 +1,10 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
+ */
 package org.elasticsearch.gradle;
 
 import org.gradle.api.Named;
@@ -110,14 +117,17 @@ public class LazyPropertyMap<K, V> extends AbstractLazyPropertyCollection implem
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        return delegate.entrySet().stream()
+        return delegate.entrySet()
+            .stream()
             .peek(this::validate)
-            .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().getValue())).entrySet();
+            .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().getValue()))
+            .entrySet();
     }
 
     @Override
     public List<? extends Object> getNormalizedCollection() {
-        return delegate.values().stream()
+        return delegate.values()
+            .stream()
             .peek(this::validate)
             .filter(entry -> entry.getNormalization() != PropertyNormalization.IGNORE_VALUE)
             .map(entry -> normalizationMapper == null ? entry : normalizationMapper.apply(entry.getKey(), entry.getValue()))
@@ -143,11 +153,13 @@ public class LazyPropertyMap<K, V> extends AbstractLazyPropertyCollection implem
             this.normalization = normalization;
         }
 
+        @Input
         public PropertyNormalization getNormalization() {
             return normalization;
         }
 
         @Override
+        @Input
         public String getName() {
             return getKey().toString();
         }

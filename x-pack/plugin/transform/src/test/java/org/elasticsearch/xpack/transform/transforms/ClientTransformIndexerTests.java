@@ -1,24 +1,24 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.transform.transforms;
 
 import org.elasticsearch.client.Client;
-import org.elasticsearch.tasks.TaskId;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
-import org.elasticsearch.xpack.core.scheduler.SchedulerEngine;
-import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerStats;
-import org.elasticsearch.xpack.core.transform.transforms.TransformTaskParams;
 import org.elasticsearch.xpack.core.transform.transforms.TransformCheckpoint;
 import org.elasticsearch.xpack.core.transform.transforms.TransformConfig;
+import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerStats;
+import org.elasticsearch.xpack.core.transform.transforms.persistence.TransformInternalIndexConstants;
 import org.elasticsearch.xpack.transform.checkpoint.CheckpointProvider;
 import org.elasticsearch.xpack.transform.notifications.TransformAuditor;
-import org.elasticsearch.xpack.transform.persistence.TransformConfigManager;
+import org.elasticsearch.xpack.transform.persistence.IndexBasedTransformConfigManager;
+import org.elasticsearch.xpack.transform.persistence.SeqNoPrimaryTermAndIndex;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -36,18 +36,10 @@ public class ClientTransformIndexerTests extends ESTestCase {
     public void testAudiOnFinishFrequency() {
         ThreadPool threadPool = mock(ThreadPool.class);
         when(threadPool.executor("generic")).thenReturn(mock(ExecutorService.class));
-        TransformTask parentTask = new TransformTask(1,
-            "transform",
-            "ptask",
-            new TaskId("transform:1"),
-            mock(TransformTaskParams.class),
-            null,
-            mock(SchedulerEngine.class),
-            mock(TransformAuditor.class),
-            threadPool,
-            Collections.emptyMap());
+
         ClientTransformIndexer indexer = new ClientTransformIndexer(
-            mock(TransformConfigManager.class),
+            mock(ThreadPool.class),
+            mock(IndexBasedTransformConfigManager.class),
             mock(CheckpointProvider.class),
             new AtomicReference<>(IndexerState.STOPPED),
             null,
@@ -57,18 +49,12 @@ public class ClientTransformIndexerTests extends ESTestCase {
             mock(TransformConfig.class),
             Collections.emptyMap(),
             null,
-            new TransformCheckpoint("transform",
-                Instant.now().toEpochMilli(),
-                0L,
-                Collections.emptyMap(),
-                Instant.now().toEpochMilli()),
-            new TransformCheckpoint("transform",
-                Instant.now().toEpochMilli(),
-                2L,
-                Collections.emptyMap(),
-                Instant.now().toEpochMilli()),
-            parentTask,
-            false);
+            new TransformCheckpoint("transform", Instant.now().toEpochMilli(), 0L, Collections.emptyMap(), Instant.now().toEpochMilli()),
+            new TransformCheckpoint("transform", Instant.now().toEpochMilli(), 2L, Collections.emptyMap(), Instant.now().toEpochMilli()),
+            new SeqNoPrimaryTermAndIndex(1, 1, TransformInternalIndexConstants.LATEST_INDEX_NAME),
+            mock(TransformContext.class),
+            false
+        );
 
         List<Boolean> shouldAudit = IntStream.range(0, 100_000).boxed().map(indexer::shouldAuditOnFinish).collect(Collectors.toList());
 

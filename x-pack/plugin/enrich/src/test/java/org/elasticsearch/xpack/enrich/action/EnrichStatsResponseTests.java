@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.enrich.action;
 
@@ -31,8 +32,13 @@ public class EnrichStatsResponseTests extends AbstractWireSerializingTestCase<En
         int numCoordinatingStats = randomIntBetween(0, 16);
         List<CoordinatorStats> coordinatorStats = new ArrayList<>(numCoordinatingStats);
         for (int i = 0; i < numCoordinatingStats; i++) {
-            CoordinatorStats stats = new CoordinatorStats(randomAlphaOfLength(4), randomIntBetween(0, 8096),
-                randomIntBetween(0, 8096), randomNonNegativeLong(), randomNonNegativeLong());
+            CoordinatorStats stats = new CoordinatorStats(
+                randomAlphaOfLength(4),
+                randomIntBetween(0, 8096),
+                randomIntBetween(0, 8096),
+                randomNonNegativeLong(),
+                randomNonNegativeLong()
+            );
             coordinatorStats.add(stats);
         }
         return new EnrichStatsAction.Response(executingPolicies, coordinatorStats);
@@ -49,12 +55,12 @@ public class EnrichStatsResponseTests extends AbstractWireSerializingTestCase<En
         String action = randomAlphaOfLength(5);
         String description = randomAlphaOfLength(5);
         long startTime = randomLong();
-        long runningTimeNanos = randomLong();
+        long runningTimeNanos = randomNonNegativeLong();
         boolean cancellable = randomBoolean();
         TaskId parentTaskId = TaskId.EMPTY_TASK_ID;
-        Map<String, String> headers = randomBoolean() ?
-            Collections.emptyMap() :
-            Collections.singletonMap(randomAlphaOfLength(5), randomAlphaOfLength(5));
+        Map<String, String> headers = randomBoolean()
+            ? Collections.emptyMap()
+            : Collections.singletonMap(randomAlphaOfLength(5), randomAlphaOfLength(5));
         return new TaskInfo(taskId, type, action, description, null, startTime, runningTimeNanos, cancellable, parentTaskId, headers);
     }
 }

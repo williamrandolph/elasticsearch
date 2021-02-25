@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.core.transform.action;
@@ -23,7 +24,7 @@ public class GetTransformStatsActionResponseTests extends AbstractWireSerializin
         List<TransformStats> stats = new ArrayList<>();
         int totalStats = randomInt(10);
         for (int i = 0; i < totalStats; ++i) {
-            stats.add(TransformStatsTests.randomDataFrameTransformStats());
+            stats.add(TransformStatsTests.randomTransformStats());
         }
         int totalErrors = randomInt(10);
         List<TaskOperationFailure> taskFailures = new ArrayList<>(totalErrors);

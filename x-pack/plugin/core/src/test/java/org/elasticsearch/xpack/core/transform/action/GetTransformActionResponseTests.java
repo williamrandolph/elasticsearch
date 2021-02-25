@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.core.transform.action;
@@ -28,9 +29,9 @@ public class GetTransformActionResponseTests extends AbstractWireSerializingTran
         List<TransformConfig> transforms = new ArrayList<>();
 
         transforms.add(TransformConfigTests.randomTransformConfig());
-        transforms.add(TransformConfigTests.randomInvalidDataFrameTransformConfig());
+        transforms.add(TransformConfigTests.randomInvalidTransformConfig());
         transforms.add(TransformConfigTests.randomTransformConfig());
-        transforms.add(TransformConfigTests.randomInvalidDataFrameTransformConfig());
+        transforms.add(TransformConfigTests.randomInvalidTransformConfig());
 
         Response r = new Response(transforms, transforms.size());
         XContentBuilder builder = XContentFactory.contentBuilder(randomFrom(XContentType.values()));
@@ -58,13 +59,17 @@ public class GetTransformActionResponseTests extends AbstractWireSerializingTran
         Map<String, Object> responseAsMap = createParser(builder).map();
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> transformsResponse = (List<Map<String, Object>>) XContentMapValues.extractValue("transforms",
-                responseAsMap);
+        List<Map<String, Object>> transformsResponse = (List<Map<String, Object>>) XContentMapValues.extractValue(
+            "transforms",
+            responseAsMap
+        );
 
         assertEquals(transforms.size(), transformsResponse.size());
         for (int i = 0; i < transforms.size(); ++i) {
-            assertArrayEquals(transforms.get(i).getSource().getIndex(),
-                ((ArrayList<String>)XContentMapValues.extractValue("source.index", transformsResponse.get(i))).toArray(new String[0]));
+            assertArrayEquals(
+                transforms.get(i).getSource().getIndex(),
+                ((ArrayList<String>) XContentMapValues.extractValue("source.index", transformsResponse.get(i))).toArray(new String[0])
+            );
             assertEquals(null, XContentMapValues.extractValue("headers", transformsResponse.get(i)));
         }
     }

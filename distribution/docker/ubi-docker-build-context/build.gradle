@@ -1,11 +1,13 @@
+import org.elasticsearch.gradle.DockerBase
+
 apply plugin: 'base'
 
-task buildUbiDockerBuildContext(type: Tar) {
-    extension = 'tar.gz'
-    compression = Compression.GZIP
-    archiveClassifier = "ubi-docker-build-context"
-    archiveBaseName = "elasticsearch"
-    with dockerBuildContext(false, true, false)
+tasks.register("buildUbiDockerBuildContext", Tar) {
+  archiveExtension = 'tar.gz'
+  compression = Compression.GZIP
+  archiveClassifier = "docker-build-context"
+  archiveBaseName = "elasticsearch-ubi8"
+  with dockerBuildContext(null, false, DockerBase.UBI, false)
 }
 
-assemble.dependsOn buildUbiDockerBuildContext
+tasks.named("assemble").configure { dependsOn("buildUbiDockerBuildContext") }

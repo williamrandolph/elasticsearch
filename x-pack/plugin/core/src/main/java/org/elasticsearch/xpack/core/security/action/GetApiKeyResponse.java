@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 
 package org.elasticsearch.xpack.core.security.action;
@@ -63,7 +64,7 @@ public final class GetApiKeyResponse extends ActionResponse implements ToXConten
     }
 
     @SuppressWarnings("unchecked")
-    static ConstructingObjectParser<GetApiKeyResponse, Void> PARSER = new ConstructingObjectParser<>("get_api_key_response", args -> {
+    static final ConstructingObjectParser<GetApiKeyResponse, Void> PARSER = new ConstructingObjectParser<>("get_api_key_response", args -> {
         return (args[0] == null) ? GetApiKeyResponse.emptyResponse() : new GetApiKeyResponse((List<ApiKey>) args[0]);
     });
     static {

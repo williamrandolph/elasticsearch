@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 package org.elasticsearch.transport;
 
@@ -24,6 +13,7 @@ import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.bytes.CompositeBytesReference;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
+import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 
@@ -31,7 +21,7 @@ import java.io.IOException;
 
 abstract class OutboundMessage extends NetworkMessage {
 
-    private final Writeable message;
+    protected final Writeable message;
 
     OutboundMessage(ThreadContext threadContext, Version version, byte status, long requestId, Writeable message) {
         super(threadContext, version, status, requestId);
@@ -39,20 +29,36 @@ abstract class OutboundMessage extends NetworkMessage {
     }
 
     BytesReference serialize(BytesStreamOutput bytesStream) throws IOException {
-        storedContext.restore();
         bytesStream.setVersion(version);
-        bytesStream.skip(TcpHeader.HEADER_SIZE);
+        bytesStream.skip(TcpHeader.headerSize(version));
 
         // The compressible bytes stream will not close the underlying bytes stream
         BytesReference reference;
-        try (CompressibleBytesOutputStream stream = new CompressibleBytesOutputStream(bytesStream, TransportStatus.isCompress(status))) {
+        int variableHeaderLength = -1;
+        final long preHeaderPosition = bytesStream.position();
+
+        if (version.onOrAfter(TcpHeader.VERSION_WITH_HEADER_SIZE)) {
+            writeVariableHeader(bytesStream);
+            variableHeaderLength = Math.toIntExact(bytesStream.position() - preHeaderPosition);
+        }
+
+        try (CompressibleBytesOutputStream stream =
+                 new CompressibleBytesOutputStream(bytesStream, TransportStatus.isCompress(status))) {
             stream.setVersion(version);
-            threadContext.writeTo(stream);
+            if (variableHeaderLength == -1) {
+                writeVariableHeader(stream);
+            }
             reference = writeMessage(stream);
         }
+
         bytesStream.seek(0);
-        TcpHeader.writeHeader(bytesStream, requestId, status, version, reference.length() - TcpHeader.HEADER_SIZE);
+        final int contentSize = reference.length() - TcpHeader.headerSize(version);
+        TcpHeader.writeHeader(bytesStream, requestId, status, version, contentSize, variableHeaderLength);
         return reference;
+    }
+
+    protected void writeVariableHeader(StreamOutput stream) throws IOException {
+        threadContext.writeTo(stream);
     }
 
     protected BytesReference writeMessage(CompressibleBytesOutputStream stream) throws IOException {
@@ -77,7 +83,7 @@ abstract class OutboundMessage extends NetworkMessage {
         if (zeroCopyBuffer.length() == 0) {
             return message;
         } else {
-            return new CompositeBytesReference(message, zeroCopyBuffer);
+            return CompositeBytesReference.of(message, zeroCopyBuffer);
         }
     }
 
@@ -92,13 +98,13 @@ abstract class OutboundMessage extends NetworkMessage {
         }
 
         @Override
-        protected BytesReference writeMessage(CompressibleBytesOutputStream out) throws IOException {
+        protected void writeVariableHeader(StreamOutput stream) throws IOException {
+            super.writeVariableHeader(stream);
             if (version.before(Version.V_8_0_0)) {
                 // empty features array
-                out.writeStringArray(Strings.EMPTY_ARRAY);
+                stream.writeStringArray(Strings.EMPTY_ARRAY);
             }
-            out.writeString(action);
-            return super.writeMessage(out);
+            stream.writeString(action);
         }
 
         private static byte setStatus(boolean compress, boolean isHandshake, Writeable message) {
@@ -112,6 +118,12 @@ abstract class OutboundMessage extends NetworkMessage {
             }
 
             return status;
+        }
+
+
+        @Override
+        public String toString() {
+            return "Request{" + action + "}{" + requestId + "}{" + isError() + "}{" + isCompress() + "}{" + isHandshake() + "}";
         }
     }
 
@@ -135,6 +147,12 @@ abstract class OutboundMessage extends NetworkMessage {
             }
 
             return status;
+        }
+
+        @Override
+        public String toString() {
+            return "Response{" + requestId + "}{" + isError() + "}{" + isCompress() + "}{" + isHandshake() + "}{"
+                    + message.getClass() + "}";
         }
     }
 

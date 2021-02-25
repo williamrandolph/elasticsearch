@@ -1,25 +1,15 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package org.elasticsearch.client;
 
 import com.fasterxml.jackson.core.JsonParseException;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -52,30 +42,46 @@ import org.elasticsearch.client.ilm.FreezeAction;
 import org.elasticsearch.client.ilm.LifecycleAction;
 import org.elasticsearch.client.ilm.ReadOnlyAction;
 import org.elasticsearch.client.ilm.RolloverAction;
+import org.elasticsearch.client.ilm.SearchableSnapshotAction;
 import org.elasticsearch.client.ilm.SetPriorityAction;
 import org.elasticsearch.client.ilm.ShrinkAction;
 import org.elasticsearch.client.ilm.UnfollowAction;
+import org.elasticsearch.client.ilm.WaitForSnapshotAction;
 import org.elasticsearch.client.ml.dataframe.DataFrameAnalysis;
-import org.elasticsearch.client.ml.dataframe.OutlierDetection;
+import org.elasticsearch.client.ml.dataframe.evaluation.classification.AccuracyMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.classification.AucRocMetric;
 import org.elasticsearch.client.ml.dataframe.evaluation.classification.Classification;
-import org.elasticsearch.client.ml.dataframe.evaluation.regression.MeanSquaredErrorMetric;
 import org.elasticsearch.client.ml.dataframe.evaluation.classification.MulticlassConfusionMatrixMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.outlierdetection.ConfusionMatrixMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.outlierdetection.OutlierDetection;
+import org.elasticsearch.client.ml.dataframe.evaluation.outlierdetection.PrecisionMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.outlierdetection.RecallMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.regression.HuberMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.regression.MeanSquaredErrorMetric;
+import org.elasticsearch.client.ml.dataframe.evaluation.regression.MeanSquaredLogarithmicErrorMetric;
 import org.elasticsearch.client.ml.dataframe.evaluation.regression.RSquaredMetric;
 import org.elasticsearch.client.ml.dataframe.evaluation.regression.Regression;
-import org.elasticsearch.client.ml.dataframe.evaluation.softclassification.AucRocMetric;
-import org.elasticsearch.client.ml.dataframe.evaluation.softclassification.BinarySoftClassification;
-import org.elasticsearch.client.ml.dataframe.evaluation.softclassification.ConfusionMatrixMetric;
-import org.elasticsearch.client.ml.dataframe.evaluation.softclassification.PrecisionMetric;
-import org.elasticsearch.client.ml.dataframe.evaluation.softclassification.RecallMetric;
+import org.elasticsearch.client.ml.dataframe.stats.classification.ClassificationStats;
+import org.elasticsearch.client.ml.dataframe.stats.outlierdetection.OutlierDetectionStats;
+import org.elasticsearch.client.ml.dataframe.stats.regression.RegressionStats;
+import org.elasticsearch.client.ml.inference.preprocessing.CustomWordEmbedding;
+import org.elasticsearch.client.ml.inference.preprocessing.FrequencyEncoding;
+import org.elasticsearch.client.ml.inference.preprocessing.Multi;
+import org.elasticsearch.client.ml.inference.preprocessing.NGram;
+import org.elasticsearch.client.ml.inference.preprocessing.OneHotEncoding;
+import org.elasticsearch.client.ml.inference.preprocessing.TargetMeanEncoding;
+import org.elasticsearch.client.ml.inference.trainedmodel.ClassificationConfig;
+import org.elasticsearch.client.ml.inference.trainedmodel.RegressionConfig;
 import org.elasticsearch.client.ml.inference.trainedmodel.ensemble.Ensemble;
+import org.elasticsearch.client.ml.inference.trainedmodel.ensemble.Exponent;
 import org.elasticsearch.client.ml.inference.trainedmodel.ensemble.LogisticRegression;
 import org.elasticsearch.client.ml.inference.trainedmodel.ensemble.WeightedMode;
 import org.elasticsearch.client.ml.inference.trainedmodel.ensemble.WeightedSum;
+import org.elasticsearch.client.ml.inference.trainedmodel.langident.LangIdentNeuralNetwork;
 import org.elasticsearch.client.ml.inference.trainedmodel.tree.Tree;
-import org.elasticsearch.client.ml.inference.preprocessing.FrequencyEncoding;
-import org.elasticsearch.client.ml.inference.preprocessing.OneHotEncoding;
-import org.elasticsearch.client.ml.inference.preprocessing.TargetMeanEncoding;
+import org.elasticsearch.client.transform.transforms.RetentionPolicyConfig;
 import org.elasticsearch.client.transform.transforms.SyncConfig;
+import org.elasticsearch.client.transform.transforms.TimeRetentionPolicyConfig;
 import org.elasticsearch.client.transform.transforms.TimeSyncConfig;
 import org.elasticsearch.common.CheckedFunction;
 import org.elasticsearch.common.bytes.BytesReference;
@@ -94,6 +100,7 @@ import org.elasticsearch.index.rankeval.ExpectedReciprocalRank;
 import org.elasticsearch.index.rankeval.MeanReciprocalRank;
 import org.elasticsearch.index.rankeval.MetricDetail;
 import org.elasticsearch.index.rankeval.PrecisionAtK;
+import org.elasticsearch.index.rankeval.RecallAtK;
 import org.elasticsearch.join.aggregations.ChildrenAggregationBuilder;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
@@ -105,7 +112,6 @@ import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.test.InternalAggregationTestCase;
 import org.elasticsearch.test.rest.yaml.restspec.ClientYamlSuiteRestApi;
 import org.elasticsearch.test.rest.yaml.restspec.ClientYamlSuiteRestSpec;
-
 import org.hamcrest.Matchers;
 import org.junit.Before;
 
@@ -127,6 +133,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.elasticsearch.client.ml.dataframe.evaluation.MlEvaluationNamedXContentProvider.registeredMetricName;
 import static org.elasticsearch.common.xcontent.XContentHelper.toXContent;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -672,6 +679,12 @@ public class RestHighLevelClientTests extends ESTestCase {
         List<NamedXContentRegistry.Entry> namedXContents = RestHighLevelClient.getDefaultNamedXContents();
         int expectedInternalAggregations = InternalAggregationTestCase.getDefaultNamedXContents().size();
         int expectedSuggestions = 3;
+
+        // Explicitly check for metrics from the analytics module because they aren't in InternalAggregationTestCase
+        assertTrue(namedXContents.removeIf(e -> e.name.getPreferredName().equals("string_stats")));
+        assertTrue(namedXContents.removeIf(e -> e.name.getPreferredName().equals("top_metrics")));
+        assertTrue(namedXContents.removeIf(e -> e.name.getPreferredName().equals("inference")));
+
         assertEquals(expectedInternalAggregations + expectedSuggestions, namedXContents.size());
         Map<Class<?>, Integer> categories = new HashMap<>();
         for (NamedXContentRegistry.Entry namedXContent : namedXContents) {
@@ -687,7 +700,7 @@ public class RestHighLevelClientTests extends ESTestCase {
 
     public void testProvidedNamedXContents() {
         List<NamedXContentRegistry.Entry> namedXContents = RestHighLevelClient.getProvidedNamedXContents();
-        assertEquals(49, namedXContents.size());
+        assertEquals(77, namedXContents.size());
         Map<Class<?>, Integer> categories = new HashMap<>();
         List<String> names = new ArrayList<>();
         for (NamedXContentRegistry.Entry namedXContent : namedXContents) {
@@ -697,78 +710,116 @@ public class RestHighLevelClientTests extends ESTestCase {
                 categories.put(namedXContent.categoryClass, counter + 1);
             }
         }
-        assertEquals("Had: " + categories, 12, categories.size());
+        assertEquals("Had: " + categories, 15, categories.size());
         assertEquals(Integer.valueOf(3), categories.get(Aggregation.class));
         assertTrue(names.contains(ChildrenAggregationBuilder.NAME));
         assertTrue(names.contains(MatrixStatsAggregationBuilder.NAME));
-        assertEquals(Integer.valueOf(4), categories.get(EvaluationMetric.class));
+        assertEquals(Integer.valueOf(5), categories.get(EvaluationMetric.class));
         assertTrue(names.contains(PrecisionAtK.NAME));
+        assertTrue(names.contains(RecallAtK.NAME));
         assertTrue(names.contains(DiscountedCumulativeGain.NAME));
         assertTrue(names.contains(MeanReciprocalRank.NAME));
         assertTrue(names.contains(ExpectedReciprocalRank.NAME));
-        assertEquals(Integer.valueOf(4), categories.get(MetricDetail.class));
+        assertEquals(Integer.valueOf(5), categories.get(MetricDetail.class));
         assertTrue(names.contains(PrecisionAtK.NAME));
+        assertTrue(names.contains(RecallAtK.NAME));
         assertTrue(names.contains(MeanReciprocalRank.NAME));
         assertTrue(names.contains(DiscountedCumulativeGain.NAME));
         assertTrue(names.contains(ExpectedReciprocalRank.NAME));
-        assertEquals(Integer.valueOf(9), categories.get(LifecycleAction.class));
+        assertEquals(Integer.valueOf(12), categories.get(LifecycleAction.class));
         assertTrue(names.contains(UnfollowAction.NAME));
         assertTrue(names.contains(AllocateAction.NAME));
         assertTrue(names.contains(DeleteAction.NAME));
         assertTrue(names.contains(ForceMergeAction.NAME));
         assertTrue(names.contains(ReadOnlyAction.NAME));
         assertTrue(names.contains(RolloverAction.NAME));
+        assertTrue(names.contains(WaitForSnapshotAction.NAME));
         assertTrue(names.contains(ShrinkAction.NAME));
         assertTrue(names.contains(FreezeAction.NAME));
         assertTrue(names.contains(SetPriorityAction.NAME));
+        assertTrue(names.contains(SearchableSnapshotAction.NAME));
         assertEquals(Integer.valueOf(3), categories.get(DataFrameAnalysis.class));
-        assertTrue(names.contains(OutlierDetection.NAME.getPreferredName()));
+        assertTrue(names.contains(org.elasticsearch.client.ml.dataframe.OutlierDetection.NAME.getPreferredName()));
         assertTrue(names.contains(org.elasticsearch.client.ml.dataframe.Regression.NAME.getPreferredName()));
         assertTrue(names.contains(org.elasticsearch.client.ml.dataframe.Classification.NAME.getPreferredName()));
+        assertTrue(names.contains(OutlierDetectionStats.NAME.getPreferredName()));
+        assertTrue(names.contains(RegressionStats.NAME.getPreferredName()));
+        assertTrue(names.contains(ClassificationStats.NAME.getPreferredName()));
         assertEquals(Integer.valueOf(1), categories.get(SyncConfig.class));
         assertTrue(names.contains(TimeSyncConfig.NAME));
+        assertEquals(Integer.valueOf(1), categories.get(RetentionPolicyConfig.class));
+        assertTrue(names.contains(TimeRetentionPolicyConfig.NAME));
         assertEquals(Integer.valueOf(3), categories.get(org.elasticsearch.client.ml.dataframe.evaluation.Evaluation.class));
-        assertThat(names, hasItems(BinarySoftClassification.NAME, Classification.NAME, Regression.NAME));
-        assertEquals(Integer.valueOf(7), categories.get(org.elasticsearch.client.ml.dataframe.evaluation.EvaluationMetric.class));
+        assertThat(names, hasItems(OutlierDetection.NAME, Classification.NAME, Regression.NAME));
+        assertEquals(Integer.valueOf(13), categories.get(org.elasticsearch.client.ml.dataframe.evaluation.EvaluationMetric.class));
         assertThat(names,
-            hasItems(AucRocMetric.NAME,
-                PrecisionMetric.NAME,
-                RecallMetric.NAME,
-                ConfusionMatrixMetric.NAME,
-                MulticlassConfusionMatrixMetric.NAME,
-                MeanSquaredErrorMetric.NAME,
-                RSquaredMetric.NAME));
-        assertEquals(Integer.valueOf(7), categories.get(org.elasticsearch.client.ml.dataframe.evaluation.EvaluationMetric.Result.class));
+            hasItems(
+                registeredMetricName(OutlierDetection.NAME, AucRocMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, PrecisionMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, RecallMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, ConfusionMatrixMetric.NAME),
+                registeredMetricName(Classification.NAME, AucRocMetric.NAME),
+                registeredMetricName(Classification.NAME, AccuracyMetric.NAME),
+                registeredMetricName(
+                    Classification.NAME, org.elasticsearch.client.ml.dataframe.evaluation.classification.PrecisionMetric.NAME),
+                registeredMetricName(
+                    Classification.NAME, org.elasticsearch.client.ml.dataframe.evaluation.classification.RecallMetric.NAME),
+                registeredMetricName(Classification.NAME, MulticlassConfusionMatrixMetric.NAME),
+                registeredMetricName(Regression.NAME, MeanSquaredErrorMetric.NAME),
+                registeredMetricName(Regression.NAME, MeanSquaredLogarithmicErrorMetric.NAME),
+                registeredMetricName(Regression.NAME, HuberMetric.NAME),
+                registeredMetricName(Regression.NAME, RSquaredMetric.NAME)));
+        assertEquals(Integer.valueOf(13), categories.get(org.elasticsearch.client.ml.dataframe.evaluation.EvaluationMetric.Result.class));
         assertThat(names,
-            hasItems(AucRocMetric.NAME,
-                PrecisionMetric.NAME,
-                RecallMetric.NAME,
-                ConfusionMatrixMetric.NAME,
-                MulticlassConfusionMatrixMetric.NAME,
-                MeanSquaredErrorMetric.NAME,
-                RSquaredMetric.NAME));
-        assertEquals(Integer.valueOf(3), categories.get(org.elasticsearch.client.ml.inference.preprocessing.PreProcessor.class));
-        assertThat(names, hasItems(FrequencyEncoding.NAME, OneHotEncoding.NAME, TargetMeanEncoding.NAME));
-        assertEquals(Integer.valueOf(2), categories.get(org.elasticsearch.client.ml.inference.trainedmodel.TrainedModel.class));
-        assertThat(names, hasItems(Tree.NAME, Ensemble.NAME));
-        assertEquals(Integer.valueOf(3),
+            hasItems(
+                registeredMetricName(OutlierDetection.NAME, AucRocMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, PrecisionMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, RecallMetric.NAME),
+                registeredMetricName(OutlierDetection.NAME, ConfusionMatrixMetric.NAME),
+                registeredMetricName(Classification.NAME, AucRocMetric.NAME),
+                registeredMetricName(Classification.NAME, AccuracyMetric.NAME),
+                registeredMetricName(
+                    Classification.NAME, org.elasticsearch.client.ml.dataframe.evaluation.classification.PrecisionMetric.NAME),
+                registeredMetricName(
+                    Classification.NAME, org.elasticsearch.client.ml.dataframe.evaluation.classification.RecallMetric.NAME),
+                registeredMetricName(Classification.NAME, MulticlassConfusionMatrixMetric.NAME),
+                registeredMetricName(Regression.NAME, MeanSquaredErrorMetric.NAME),
+                registeredMetricName(Regression.NAME, MeanSquaredLogarithmicErrorMetric.NAME),
+                registeredMetricName(Regression.NAME, HuberMetric.NAME),
+                registeredMetricName(Regression.NAME, RSquaredMetric.NAME)));
+        assertEquals(Integer.valueOf(6), categories.get(org.elasticsearch.client.ml.inference.preprocessing.PreProcessor.class));
+        assertThat(names,
+            hasItems(
+                FrequencyEncoding.NAME,
+                OneHotEncoding.NAME,
+                TargetMeanEncoding.NAME,
+                CustomWordEmbedding.NAME,
+                NGram.NAME,
+                Multi.NAME
+            ));
+        assertEquals(Integer.valueOf(3), categories.get(org.elasticsearch.client.ml.inference.trainedmodel.TrainedModel.class));
+        assertThat(names, hasItems(Tree.NAME, Ensemble.NAME, LangIdentNeuralNetwork.NAME));
+        assertEquals(Integer.valueOf(4),
             categories.get(org.elasticsearch.client.ml.inference.trainedmodel.ensemble.OutputAggregator.class));
-        assertThat(names, hasItems(WeightedMode.NAME, WeightedSum.NAME, LogisticRegression.NAME));
+        assertThat(names, hasItems(WeightedMode.NAME, WeightedSum.NAME, LogisticRegression.NAME, Exponent.NAME));
+        assertEquals(Integer.valueOf(2),
+            categories.get(org.elasticsearch.client.ml.inference.trainedmodel.InferenceConfig.class));
+        assertThat(names, hasItems(ClassificationConfig.NAME.getPreferredName(), RegressionConfig.NAME.getPreferredName()));
     }
 
     public void testApiNamingConventions() throws Exception {
         //this list should be empty once the high-level client is feature complete
         String[] notYetSupportedApi = new String[]{
-            "cluster.remote_info",
             "create",
             "get_script_context",
-            "get_source",
-            "indices.delete_alias",
+            "get_script_languages",
             "indices.exists_type",
-            "indices.get_upgrade",
             "indices.put_alias",
             "render_search_template",
-            "scripts_painless_execute"
+            "scripts_painless_execute",
+            "indices.simulate_template",
+            "indices.resolve_index",
+            "indices.add_block"
         };
         //These API are not required for high-level client feature completeness
         String[] notRequiredApi = new String[] {
@@ -777,8 +828,12 @@ public class RestHighLevelClientTests extends ESTestCase {
             "cluster.reroute",
             "cluster.state",
             "cluster.stats",
+            "cluster.post_voting_config_exclusions",
+            "cluster.delete_voting_config_exclusions",
+            "dangling_indices.delete_dangling_index",
+            "dangling_indices.import_dangling_index",
+            "dangling_indices.list_dangling_indices",
             "indices.shard_stores",
-            "indices.upgrade",
             "indices.recovery",
             "indices.segments",
             "indices.stats",
@@ -800,7 +855,7 @@ public class RestHighLevelClientTests extends ESTestCase {
         deprecatedMethods.add("multi_search");
         deprecatedMethods.add("search_scroll");
 
-        ClientYamlSuiteRestSpec restSpec = ClientYamlSuiteRestSpec.load("/rest-api-spec/api");
+        ClientYamlSuiteRestSpec restSpec = ClientYamlSuiteRestSpec.load("rest-api-spec/api");
         Set<String> apiSpec = restSpec.getApis().stream().map(ClientYamlSuiteRestApi::getName).collect(Collectors.toSet());
         Set<String> apiUnsupported = new HashSet<>(apiSpec);
         Set<String> apiNotFound = new HashSet<>();
@@ -825,7 +880,8 @@ public class RestHighLevelClientTests extends ESTestCase {
         // looking like it doesn't have a valid implementatation when it does.
         apiUnsupported.remove("indices.get_template");
 
-
+        // Synced flush is deprecated
+        apiUnsupported.remove("indices.flush_synced");
 
         for (Map.Entry<String, Set<Method>> entry : methods.entrySet()) {
             String apiName = entry.getKey();
@@ -861,11 +917,19 @@ public class RestHighLevelClientTests extends ESTestCase {
                                 apiName.startsWith("ccr.") == false &&
                                 apiName.startsWith("enrich.") == false &&
                                 apiName.startsWith("transform.") == false &&
+                                apiName.startsWith("text_structure.") == false &&
+                                apiName.startsWith("searchable_snapshots.") == false &&
+                                apiName.startsWith("eql.") == false &&
                                 apiName.endsWith("freeze") == false &&
                                 apiName.endsWith("reload_analyzers") == false &&
+                                apiName.startsWith("async_search") == false &&
                                 // IndicesClientIT.getIndexTemplate should be renamed "getTemplate" in version 8.0 when we
                                 // can get rid of 7.0's deprecated "getTemplate"
-                                apiName.equals("indices.get_index_template") == false) {
+                                apiName.equals("indices.get_index_template") == false &&
+                                List.of("indices.data_streams_stats",
+                                    "indices.delete_data_stream",
+                                    "indices.create_data_stream",
+                                    "indices.get_data_stream").contains(apiName) == false) {
                                 apiNotFound.add(apiName);
                             }
                         }
@@ -891,7 +955,7 @@ public class RestHighLevelClientTests extends ESTestCase {
                 method.getReturnType().getSimpleName(), equalTo("boolean"));
         } else {
             // It's acceptable for 404s to be represented as empty Optionals
-            if (!method.getReturnType().isAssignableFrom(Optional.class)) {
+            if (method.getReturnType().isAssignableFrom(Optional.class) == false) {
                 assertThat("the return type for method [" + method + "] is incorrect",
                     method.getReturnType().getSimpleName(), endsWith("Response"));
             }
