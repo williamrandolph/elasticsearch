@@ -11,6 +11,7 @@ package org.elasticsearch.indices.settings;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.Priority;
@@ -737,10 +738,25 @@ public class UpdateSettingsIT extends ESIntegTestCase {
             String settingWithoutPrefix = setting.substring(INDEX_SETTING_PREFIX.length());
 
             Settings settings = Settings.builder().put(settingWithoutPrefix, true).build();
+            GetSettingsResponse response;
             assertAcked(client().admin().indices().prepareUpdateSettings("test").setSettings(settings));
+            if (setting.equals(SETTING_BLOCKS_METADATA)) {
+                expectThrows(ClusterBlockException.class, () -> client().admin().indices().prepareGetSettings("test").get());
+            } else {
+                response = client().admin().indices().prepareGetSettings("test").get();
+                assertThat(response.getSetting("test", setting), equalTo("true"));
+            }
 
             settings = Settings.builder().put(settingWithoutPrefix, false).build();
             assertAcked(client().admin().indices().prepareUpdateSettings("test").setSettings(settings));
+            response = client().admin().indices().prepareGetSettings("test").get();
+            assertThat(response.getSetting("test", setting), equalTo("false"));
+
+            settings = Settings.builder().putNull(settingWithoutPrefix).build();
+            assertAcked(client().admin().indices().prepareUpdateSettings("test").setSettings(settings));
+            assertAcked(client().admin().indices().prepareUpdateSettings("test").setSettings(settings));
+            response = client().admin().indices().prepareGetSettings("test").get();
+            assertThat(response.getSetting("test", setting), equalTo(null));
         }
     }
 }
