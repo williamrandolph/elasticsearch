@@ -1,7 +1,8 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License;
- * you may not use this file except in compliance with the Elastic License.
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
  */
 package org.elasticsearch.xpack.searchablesnapshots;
 
@@ -30,12 +31,15 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTestCase {
 
@@ -211,6 +215,8 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
             Map<String, Object> searchResults = search(restoredIndexName, QueryBuilders.matchAllQuery(), Boolean.TRUE);
             assertThat(extractValue(searchResults, "hits.total.value"), equalTo(numDocs));
 
+            waitForIdlingSearchableSnapshotsThreadPools();
+
             final long bytesInCacheBeforeClear = sumCachedBytesWritten.apply(searchableSnapshotStats(restoredIndexName));
             assertThat(bytesInCacheBeforeClear, greaterThan(0L));
 
@@ -221,6 +227,8 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
 
             searchResults = search(restoredIndexName, QueryBuilders.matchAllQuery(), Boolean.TRUE);
             assertThat(extractValue(searchResults, "hits.total.value"), equalTo(numDocs));
+
+            waitForIdlingSearchableSnapshotsThreadPools();
 
             assertBusy(() -> {
                 final long bytesInCacheAfterSearch = sumCachedBytesWritten.apply(searchableSnapshotStats(restoredIndexName));
@@ -258,6 +266,7 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
             try (XContentBuilder builder = jsonBuilder()) {
                 builder.startObject();
                 builder.field("indices", restoredIndexName);
+                builder.field("include_global_state", "false");
                 builder.endObject();
                 snapshotRequest.setEntity(new StringEntity(Strings.toString(builder), ContentType.APPLICATION_JSON));
             }
@@ -347,6 +356,7 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
     protected static void mountSnapshot(String snapshotIndexName, String mountIndexName) throws IOException {
         final Request request = new Request(HttpPost.METHOD_NAME, "/_snapshot/" + REPOSITORY_NAME + "/" + SNAPSHOT_NAME + "/_mount");
         request.addParameter("wait_for_completion", Boolean.toString(true));
+        request.addParameter("storage", randomFrom("full_copy", "shared_cache"));
 
         final XContentBuilder builder = JsonXContent.contentBuilder().startObject().field("index", snapshotIndexName);
         if (snapshotIndexName.equals(mountIndexName) == false || randomBoolean()) {
@@ -427,7 +437,9 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
     }
 
     protected static Map<String, Object> searchableSnapshotStats(String index) throws IOException {
-        final Response response = client().performRequest(new Request(HttpGet.METHOD_NAME, '/' + index + "/_searchable_snapshots/stats"));
+        final Request request = new Request(HttpGet.METHOD_NAME, '/' + index + "/_searchable_snapshots/stats");
+        request.addParameter("level", "shards");
+        final Response response = client().performRequest(request);
         assertThat(
             "Failed to retrieve searchable snapshots stats for on index [" + index + "]: " + response,
             response.getStatusLine().getStatusCode(),
@@ -451,6 +463,36 @@ public abstract class AbstractSearchableSnapshotsRestTestCase extends ESRestTest
             equalTo(RestStatus.OK.getStatus())
         );
         return extractValue(responseAsMap(response), index + ".settings");
+    }
+
+    @SuppressWarnings("unchecked")
+    protected static void waitForIdlingSearchableSnapshotsThreadPools() throws Exception {
+        final Set<String> searchableSnapshotsThreadPools = Set.of(
+            SearchableSnapshotsConstants.CACHE_FETCH_ASYNC_THREAD_POOL_NAME,
+            SearchableSnapshotsConstants.CACHE_PREWARMING_THREAD_POOL_NAME
+        );
+        assertBusy(() -> {
+            final Response response = client().performRequest(new Request(HttpGet.METHOD_NAME, "/_nodes/stats/thread_pool"));
+            assertThat(response.getStatusLine().getStatusCode(), equalTo(RestStatus.OK.getStatus()));
+
+            final Map<String, Object> nodes = extractValue(responseAsMap(response), "nodes");
+            assertThat(nodes, notNullValue());
+
+            for (String node : nodes.keySet()) {
+                final Map<String, Object> threadPools = extractValue((Map<String, Object>) nodes.get(node), "thread_pool");
+                searchableSnapshotsThreadPools.forEach(threadPoolName -> {
+                    final Map<String, Object> threadPoolStats = (Map<String, Object>) threadPools.get(threadPoolName);
+                    assertThat(threadPoolStats, notNullValue());
+
+                    final Number active = extractValue(threadPoolStats, "active");
+                    assertThat(threadPoolName + " has still active tasks", active.longValue(), equalTo(0L));
+
+                    final Number queue = extractValue(threadPoolStats, "queue");
+                    assertThat(threadPoolName + " has still enqueued tasks", queue.longValue(), equalTo(0L));
+
+                });
+            }
+        }, 30L, TimeUnit.SECONDS);
     }
 
     @SuppressWarnings("unchecked")
