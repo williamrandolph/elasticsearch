@@ -51,6 +51,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -193,7 +195,17 @@ public class PluginsService implements ReportingService<PluginsAndModules> {
      * @param <T> The generic type of the result
      */
     public final <T> Stream<T> map(Function<Plugin, T> function) {
-        return plugins().stream().map(LoadedPlugin::instance).map(function);
+        return map((s, p) -> function.apply(p));
+    }
+
+    /**
+     * Map a biFunction over all plugins. Useful if plugin names are needed for error handling
+     * @param biFunction a function that takes a plugin name and a plugin returns a result
+     * @return A stream of results
+     * @param <T> The generic type of the result
+     */
+    public final <T> Stream<T> map(BiFunction<String, Plugin, T> biFunction) {
+        return plugins.stream().map(loadedPlugin -> biFunction.apply(loadedPlugin.descriptor.getName(), loadedPlugin.instance));
     }
 
     /**
@@ -203,7 +215,18 @@ public class PluginsService implements ReportingService<PluginsAndModules> {
      * @param <T> The generic type of the collection
      */
     public final <T> Stream<T> flatMap(Function<Plugin, Collection<T>> function) {
-        return plugins().stream().map(LoadedPlugin::instance).flatMap(p -> function.apply(p).stream());
+        return flatMap((s, p) -> function.apply(p));
+    }
+
+    /**
+     * FlatMap a biFunction over all plugins. Useful if plugin names are needed for error handling
+     * @param biFunction a function that takes a plugin name and a plugin and returns a collection
+     * @return A stream of results
+     * @param <T> The generic type of the collection
+     */
+    public final <T> Stream<T> flatMap(BiFunction<String, Plugin, Collection<T>> biFunction) {
+        return plugins.stream()
+            .flatMap(loadedPlugin -> biFunction.apply(loadedPlugin.descriptor.getName(), loadedPlugin.instance).stream());
     }
 
     /**
@@ -211,7 +234,15 @@ public class PluginsService implements ReportingService<PluginsAndModules> {
      * @param consumer An action that consumes a plugin
      */
     public final void forEach(Consumer<Plugin> consumer) {
-        plugins().stream().map(LoadedPlugin::instance).forEach(consumer);
+        forEach((s, p) -> consumer.accept(p));
+    }
+
+    /**
+     * Apply a biConsumer action to each plugin
+     * @param biConsumer A consumer that accepts a plugin name and a plugin
+     */
+    public final void forEach(BiConsumer<String, Plugin> biConsumer) {
+        plugins.forEach(loadedPlugin -> biConsumer.accept(loadedPlugin.descriptor.getName(), loadedPlugin.instance));
     }
 
     /**
@@ -219,7 +250,7 @@ public class PluginsService implements ReportingService<PluginsAndModules> {
      * @return A map of plugin names to plugin instances.
      */
     public final Map<String, Plugin> pluginMap() {
-        return plugins().stream().collect(Collectors.toMap(p -> p.descriptor().getName(), LoadedPlugin::instance));
+        return map(Tuple::tuple).collect(Collectors.toMap(Tuple::v1, Tuple::v2));
     }
 
     /**
