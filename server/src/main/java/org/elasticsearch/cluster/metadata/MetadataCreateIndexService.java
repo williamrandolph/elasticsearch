@@ -66,6 +66,7 @@ import org.elasticsearch.indices.IndexCreationException;
 import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.indices.InvalidIndexNameException;
 import org.elasticsearch.indices.ShardLimitValidator;
+import org.elasticsearch.indices.SystemIndexDescriptor;
 import org.elasticsearch.indices.SystemIndices;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
@@ -350,6 +351,12 @@ public class MetadataCreateIndexService {
             // The index being created is for a system data stream, so the backing index will also be a system index
             if (request.systemDataStreamDescriptor() != null) {
                 return applyCreateIndexRequestForSystemDataStream(currentState, request, silent, metadataTransformer);
+            }
+
+            SystemIndexDescriptor descriptor = systemIndices.findMatchingDescriptor(request.index());
+            // ignore all templates for net new system indices
+            if (descriptor != null && descriptor.isNetNew()) {
+                return applyCreateIndexRequestWithV1Templates(currentState, request, silent, List.of(), metadataTransformer);
             }
 
             // Hidden indices apply templates slightly differently (ignoring wildcard '*'
