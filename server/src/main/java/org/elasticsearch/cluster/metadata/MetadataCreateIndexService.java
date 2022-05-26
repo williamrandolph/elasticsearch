@@ -355,7 +355,7 @@ public class MetadataCreateIndexService {
 
             SystemIndexDescriptor descriptor = systemIndices.findMatchingDescriptor(request.index());
             // ignore all templates for net new system indices
-            if (descriptor != null && descriptor.isNetNew()) {
+            if (descriptor != null && descriptor.ignoreTemplates()) {
                 return applyCreateIndexRequestWithV1Templates(currentState, request, silent, List.of(), metadataTransformer);
             }
 

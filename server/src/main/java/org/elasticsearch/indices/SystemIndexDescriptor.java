@@ -524,6 +524,10 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
         return this.executorNames;
     }
 
+    /** Should we ignore applying templates at index creation time? */
+    public boolean ignoreTemplates() {
+        return isNetNew();
+    }
     public static Builder builder() {
         return new Builder();
     }
