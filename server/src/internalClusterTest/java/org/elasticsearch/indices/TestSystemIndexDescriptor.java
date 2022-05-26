@@ -54,8 +54,8 @@ public class TestSystemIndexDescriptor extends SystemIndexDescriptor {
             List.of(),
             List.of(),
             null,
-            false
-        );
+            false,
+            false);
     }
 
     @Override

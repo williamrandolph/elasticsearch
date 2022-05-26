@@ -16,6 +16,7 @@ import org.elasticsearch.Version;
 import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.cluster.metadata.Metadata;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.threadpool.ThreadPool;
@@ -41,6 +42,13 @@ import java.util.Set;
 public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<SystemIndexDescriptor> {
 
     public static final Settings DEFAULT_SETTINGS = Settings.builder().put(IndexMetadata.SETTING_INDEX_HIDDEN, true).build();
+
+    public static final String SYSTEM_INDICES_IGNORE_TEMPLATES_KEY = "system.indices_ignore_template";
+    public static final Setting<Boolean> SYSTEM_INDICES_IGNORE_TEMPLATES = Setting.boolSetting(
+        SYSTEM_INDICES_IGNORE_TEMPLATES_KEY,
+        false,
+        Setting.Property.NodeScope
+    );
 
     /**
      * A pattern, either with a wildcard or simple regex. Indices that match one of these patterns are considered system indices.
@@ -111,6 +119,8 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
      */
     private final ExecutorNames executorNames;
 
+    private final boolean ignoreTemplates;
+
     /**
      * Creates a descriptor for system indices matching the supplied pattern. These indices will not be managed
      * by Elasticsearch internally.
@@ -135,8 +145,8 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
             List.of(),
             List.of(),
             null,
-            false
-        );
+            false,
+            false);
     }
 
     /**
@@ -166,32 +176,34 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
             allowedElasticProductOrigins,
             List.of(),
             null,
-            false
-        );
+            false,
+            false);
     }
 
     /**
-     * Creates a descriptor for system indices matching the supplied pattern. These indices will be managed
-     * by Elasticsearch internally if mappings or settings are provided.
+     * Creates a descriptor for system indices matching the supplied pattern. These indices will be managed by Elasticsearch internally if
+     * mappings or settings are provided.
      *
-     * @param indexPattern The pattern of index names that this descriptor will be used for. Must start with a '.' character, must not
-     *                            overlap with any other descriptor patterns, and must allow a suffix (see note on
-     *                            {@link SystemIndexDescriptor#indexPattern} for details).
-     * @param primaryIndex The primary index name of this descriptor. Used when creating the system index for the first time.
-     * @param description The name of the plugin responsible for this system index.
-     * @param mappings The mappings to apply to this index when auto-creating, if appropriate
-     * @param settings The settings to apply to this index when auto-creating, if appropriate
-     * @param aliasName An alias for the index, or null
-     * @param indexFormat A value for the `index.format` setting. Pass 0 or higher.
-     * @param versionMetaKey a mapping key under <code>_meta</code> where a version can be found, which indicates the
-    *                       Elasticsearch version when the index was created.
-     * @param origin the client origin to use when creating this index.
-     * @param minimumNodeVersion the minimum cluster node version required for this descriptor
-     * @param type The {@link Type} of system index
+     * @param indexPattern                 The pattern of index names that this descriptor will be used for. Must start with a '.'
+     *                                     character, must not overlap with any other descriptor patterns, and must allow a suffix (see note
+     *                                     on {@link SystemIndexDescriptor#indexPattern} for details).
+     * @param primaryIndex                 The primary index name of this descriptor. Used when creating the system index for the first
+     *                                     time.
+     * @param description                  The name of the plugin responsible for this system index.
+     * @param mappings                     The mappings to apply to this index when auto-creating, if appropriate
+     * @param settings                     The settings to apply to this index when auto-creating, if appropriate
+     * @param aliasName                    An alias for the index, or null
+     * @param indexFormat                  A value for the `index.format` setting. Pass 0 or higher.
+     * @param versionMetaKey               a mapping key under <code>_meta</code> where a version can be found, which indicates the
+     *                                     Elasticsearch version when the index was created.
+     * @param origin                       the client origin to use when creating this index.
+     * @param minimumNodeVersion           the minimum cluster node version required for this descriptor
+     * @param type                         The {@link Type} of system index
      * @param allowedElasticProductOrigins A list of allowed origin values that should be allowed access in the case of external system
      *                                     indices
-     * @param priorSystemIndexDescriptors A list of system index descriptors that describe the same index in a way that is compatible with
-     *                                    older versions of Elasticsearch
+     * @param priorSystemIndexDescriptors  A list of system index descriptors that describe the same index in a way that is compatible with
+     *                                     older versions of Elasticsearch
+     * @param ignoreTemplates
      */
     SystemIndexDescriptor(
         String indexPattern,
@@ -208,8 +220,8 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
         List<String> allowedElasticProductOrigins,
         List<SystemIndexDescriptor> priorSystemIndexDescriptors,
         ExecutorNames executorNames,
-        boolean isNetNew
-    ) {
+        boolean isNetNew,
+        boolean ignoreTemplates) {
         Objects.requireNonNull(indexPattern, "system index pattern must not be null");
         if (indexPattern.length() < 2) {
             throw new IllegalArgumentException(
@@ -361,6 +373,7 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
         this.priorSystemIndexDescriptors = sortedPriorSystemIndexDescriptors;
         this.executorNames = Objects.nonNull(executorNames) ? executorNames : ExecutorNames.DEFAULT_SYSTEM_INDEX_THREAD_POOLS;
         this.isNetNew = isNetNew;
+        this.ignoreTemplates = ignoreTemplates;
     }
 
     /**
@@ -526,7 +539,7 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
 
     /** Should we ignore applying templates at index creation time? */
     public boolean ignoreTemplates() {
-        return isNetNew();
+        return this.ignoreTemplates;
     }
     public static Builder builder() {
         return new Builder();
@@ -597,6 +610,7 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
         private List<SystemIndexDescriptor> priorSystemIndexDescriptors = List.of();
         private ExecutorNames executorNames;
         private boolean isNetNew = false;
+        private boolean ignoreTemplates = false;
 
         private Builder() {}
 
@@ -680,6 +694,11 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
             return this;
         }
 
+        public Builder setIgnoreTemplates(boolean ignoreTemplates) {
+            this.ignoreTemplates = ignoreTemplates;
+            return this;
+        }
+
         /**
          * Builds a {@link SystemIndexDescriptor} using the fields supplied to this builder.
          * @return a populated descriptor.
@@ -701,8 +720,8 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
                 allowedElasticProductOrigins,
                 priorSystemIndexDescriptors,
                 executorNames,
-                isNetNew
-            );
+                isNetNew,
+                ignoreTemplates);
         }
     }
 

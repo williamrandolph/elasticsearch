@@ -103,7 +103,7 @@ public class SecurityIndexManagerTests extends ESTestCase {
         };
 
         final ClusterService clusterService = mock(ClusterService.class);
-        final SystemIndexDescriptor descriptor = new SecuritySystemIndices().getSystemIndexDescriptors()
+        final SystemIndexDescriptor descriptor = new SecuritySystemIndices(Settings.EMPTY).getSystemIndexDescriptors()
             .stream()
             .filter(d -> d.getAliasName().equals(SecuritySystemIndices.SECURITY_MAIN_ALIAS))
             .findFirst()

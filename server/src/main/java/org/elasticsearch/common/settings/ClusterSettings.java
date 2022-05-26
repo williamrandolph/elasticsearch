@@ -74,6 +74,7 @@ import org.elasticsearch.indices.IndicesQueryCache;
 import org.elasticsearch.indices.IndicesRequestCache;
 import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.indices.ShardLimitValidator;
+import org.elasticsearch.indices.SystemIndexDescriptor;
 import org.elasticsearch.indices.analysis.HunspellService;
 import org.elasticsearch.indices.breaker.BreakerSettings;
 import org.elasticsearch.indices.breaker.HierarchyCircuitBreakerService;
@@ -511,7 +512,8 @@ public final class ClusterSettings extends AbstractScopedSettings {
         IndexingPressure.MAX_INDEXING_BYTES,
         ShardLimitValidator.SETTING_CLUSTER_MAX_SHARDS_PER_NODE_FROZEN,
         DataTier.ENFORCE_DEFAULT_TIER_PREFERENCE_SETTING,
-        ReadinessService.PORT
+        ReadinessService.PORT,
+        SystemIndexDescriptor.SYSTEM_INDICES_IGNORE_TEMPLATES
     );
 
     static List<SettingUpgrader<?>> BUILT_IN_SETTING_UPGRADERS = Collections.emptyList();

@@ -58,10 +58,10 @@ public class SecuritySystemIndices {
     private SecurityIndexManager tokenIndexManager;
     private SecurityIndexManager profileIndexManager;
 
-    public SecuritySystemIndices() {
-        this.mainDescriptor = getSecurityMainIndexDescriptor();
-        this.tokenDescriptor = getSecurityTokenIndexDescriptor();
-        this.profileDescriptor = getSecurityProfileIndexDescriptor();
+    public SecuritySystemIndices(Settings settings) {
+        this.mainDescriptor = getSecurityMainIndexDescriptor(settings);
+        this.tokenDescriptor = getSecurityTokenIndexDescriptor(settings);
+        this.profileDescriptor = getSecurityProfileIndexDescriptor(settings);
         this.initialized = new AtomicBoolean(false);
         this.mainIndexManager = null;
         this.tokenIndexManager = null;
@@ -107,7 +107,7 @@ public class SecuritySystemIndices {
         }
     }
 
-    private SystemIndexDescriptor getSecurityMainIndexDescriptor() {
+    private SystemIndexDescriptor getSecurityMainIndexDescriptor(Settings settings) {
         return SystemIndexDescriptor.builder()
             // This can't just be `.security-*` because that would overlap with the tokens index pattern
             .setIndexPattern(".security-[0-9]+*")
@@ -120,6 +120,7 @@ public class SecuritySystemIndices {
             .setVersionMetaKey("security-version")
             .setOrigin(SECURITY_ORIGIN)
             .setThreadPools(ExecutorNames.CRITICAL_SYSTEM_INDEX_THREAD_POOLS)
+            .setIgnoreTemplates(SystemIndexDescriptor.SYSTEM_INDICES_IGNORE_TEMPLATES.getDefault(settings))
             .build();
     }
 
@@ -548,7 +549,7 @@ public class SecuritySystemIndices {
         }
     }
 
-    private static SystemIndexDescriptor getSecurityTokenIndexDescriptor() {
+    private static SystemIndexDescriptor getSecurityTokenIndexDescriptor(Settings settings) {
         return SystemIndexDescriptor.builder()
             .setIndexPattern(".security-tokens-[0-9]+*")
             .setPrimaryIndex(TOKENS_INDEX_CONCRETE_NAME)
@@ -560,6 +561,7 @@ public class SecuritySystemIndices {
             .setVersionMetaKey(SECURITY_VERSION_STRING)
             .setOrigin(SECURITY_ORIGIN)
             .setThreadPools(ExecutorNames.CRITICAL_SYSTEM_INDEX_THREAD_POOLS)
+            .setIgnoreTemplates(SystemIndexDescriptor.SYSTEM_INDICES_IGNORE_TEMPLATES.getDefault(settings))
             .build();
     }
 
@@ -728,7 +730,7 @@ public class SecuritySystemIndices {
         }
     }
 
-    private SystemIndexDescriptor getSecurityProfileIndexDescriptor() {
+    private SystemIndexDescriptor getSecurityProfileIndexDescriptor(Settings settings) {
         return SystemIndexDescriptor.builder()
             .setIndexPattern(".security-profile-[0-9]+*")
             .setPrimaryIndex(INTERNAL_SECURITY_PROFILE_INDEX_8)
@@ -740,6 +742,7 @@ public class SecuritySystemIndices {
             .setVersionMetaKey(SECURITY_VERSION_STRING)
             .setOrigin(SECURITY_PROFILE_ORIGIN) // new origin since 8.3
             .setThreadPools(ExecutorNames.CRITICAL_SYSTEM_INDEX_THREAD_POOLS)
+            .setIgnoreTemplates(SystemIndexDescriptor.SYSTEM_INDICES_IGNORE_TEMPLATES.getDefault(settings))
             .setMinimumNodeVersion(VERSION_SECURITY_PROFILE_ORIGIN)
             .setPriorSystemIndexDescriptors(
                 List.of(
