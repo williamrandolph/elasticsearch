@@ -205,7 +205,7 @@ public class NativeRolesStoreTests extends ESTestCase {
         final XPackLicenseState licenseState = mock(XPackLicenseState.class);
         final AtomicBoolean methodCalled = new AtomicBoolean(false);
 
-        final SecuritySystemIndices systemIndices = new SecuritySystemIndices();
+        final SecuritySystemIndices systemIndices = new SecuritySystemIndices(Settings.EMPTY);
         systemIndices.init(client, clusterService);
         final SecurityIndexManager securityIndex = systemIndices.getMainIndexManager();
 
