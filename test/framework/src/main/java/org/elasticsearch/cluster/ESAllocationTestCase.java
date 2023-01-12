@@ -48,7 +48,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
-import java.util.Random;
 import java.util.Set;
 
 import static java.util.Collections.emptyMap;
@@ -89,16 +88,12 @@ public abstract class ESAllocationTestCase extends ESTestCase {
     }
 
     public static MockAllocationService createAllocationService(Settings settings) {
-        return createAllocationService(settings, random());
+        return createAllocationService(settings, EMPTY_CLUSTER_SETTINGS);
     }
 
-    public static MockAllocationService createAllocationService(Settings settings, Random random) {
-        return createAllocationService(settings, EMPTY_CLUSTER_SETTINGS, random);
-    }
-
-    public static MockAllocationService createAllocationService(Settings settings, ClusterSettings clusterSettings, Random random) {
+    public static MockAllocationService createAllocationService(Settings settings, ClusterSettings clusterSettings) {
         return new MockAllocationService(
-            randomAllocationDeciders(settings, clusterSettings, random),
+            randomAllocationDeciders(settings, clusterSettings),
             new TestGatewayAllocator(),
             createShardsAllocator(settings),
             EmptyClusterInfoService.INSTANCE,
@@ -116,7 +111,14 @@ public abstract class ESAllocationTestCase extends ESTestCase {
 
     private static DesiredBalanceShardsAllocator createDesiredBalanceShardsAllocator(Settings settings) {
         var queue = new DeterministicTaskQueue();
-        return new DesiredBalanceShardsAllocator(new BalancedShardsAllocator(settings), queue.getThreadPool(), null, null) {
+        return new DesiredBalanceShardsAllocator(
+            Settings.EMPTY,
+            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            new BalancedShardsAllocator(settings),
+            queue.getThreadPool(),
+            null,
+            null
+        ) {
             private RoutingAllocation lastAllocation;
 
             @Override
@@ -141,7 +143,7 @@ public abstract class ESAllocationTestCase extends ESTestCase {
 
     public static MockAllocationService createAllocationService(Settings settings, ClusterInfoService clusterInfoService) {
         return new MockAllocationService(
-            randomAllocationDeciders(settings, EMPTY_CLUSTER_SETTINGS, random()),
+            randomAllocationDeciders(settings, EMPTY_CLUSTER_SETTINGS),
             new TestGatewayAllocator(),
             new BalancedShardsAllocator(settings),
             clusterInfoService,
@@ -163,7 +165,7 @@ public abstract class ESAllocationTestCase extends ESTestCase {
         SnapshotsInfoService snapshotsInfoService
     ) {
         return new MockAllocationService(
-            randomAllocationDeciders(settings, EMPTY_CLUSTER_SETTINGS, random()),
+            randomAllocationDeciders(settings, EMPTY_CLUSTER_SETTINGS),
             gatewayAllocator,
             new BalancedShardsAllocator(settings),
             EmptyClusterInfoService.INSTANCE,
@@ -171,11 +173,11 @@ public abstract class ESAllocationTestCase extends ESTestCase {
         );
     }
 
-    public static AllocationDeciders randomAllocationDeciders(Settings settings, ClusterSettings clusterSettings, Random random) {
+    public static AllocationDeciders randomAllocationDeciders(Settings settings, ClusterSettings clusterSettings) {
         List<AllocationDecider> deciders = new ArrayList<>(
             ClusterModule.createAllocationDeciders(settings, clusterSettings, Collections.emptyList())
         );
-        Collections.shuffle(deciders, random);
+        Collections.shuffle(deciders, random());
         return new AllocationDeciders(deciders);
     }
 
@@ -276,7 +278,7 @@ public abstract class ESAllocationTestCase extends ESTestCase {
         ClusterState clusterState,
         RoutingNode routingNode
     ) {
-        return startShardsAndReroute(allocationService, clusterState, routingNode.shardsWithState(INITIALIZING));
+        return startShardsAndReroute(allocationService, clusterState, routingNode.shardsWithState(INITIALIZING).toList());
     }
 
     /**

@@ -18,8 +18,6 @@ import org.elasticsearch.cluster.ESAllocationTestCase;
 import org.elasticsearch.cluster.EmptyClusterInfoService;
 import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.cluster.metadata.Metadata;
-import org.elasticsearch.cluster.node.DiscoveryNode;
-import org.elasticsearch.cluster.node.DiscoveryNodeRole;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.AllocationId;
 import org.elasticsearch.cluster.routing.IndexRoutingTable;
@@ -196,7 +194,7 @@ public class BalancedShardsAllocatorTests extends ESAllocationTestCase {
     public void testRebalanceImprovesTheBalanceOfTheShards() {
         var discoveryNodesBuilder = DiscoveryNodes.builder();
         for (int node = 0; node < 3; node++) {
-            discoveryNodesBuilder.add(createNode("node-" + node));
+            discoveryNodesBuilder.add(newNode("node-" + node));
         }
 
         var metadataBuilder = Metadata.builder();
@@ -315,6 +313,27 @@ public class BalancedShardsAllocatorTests extends ESAllocationTestCase {
         }
     }
 
+    public void testThresholdLimit() {
+        final var badValue = (float) randomDoubleBetween(0.0, Math.nextDown(1.0f), true);
+        assertEquals(
+            1.0f,
+            new BalancedShardsAllocator(Settings.builder().put(BalancedShardsAllocator.THRESHOLD_SETTING.getKey(), badValue).build())
+                .getThreshold(),
+            0.0f
+        );
+        assertCriticalWarnings("ignoring value [" + badValue + """
+            ] for [cluster.routing.allocation.balance.threshold] since it is smaller than 1.0; setting \
+            [cluster.routing.allocation.balance.threshold] to a value smaller than 1.0 will be forbidden in a future release""");
+
+        final var goodValue = (float) randomDoubleBetween(1.0, 10.0, true);
+        assertEquals(
+            goodValue,
+            new BalancedShardsAllocator(Settings.builder().put(BalancedShardsAllocator.THRESHOLD_SETTING.getKey(), goodValue).build())
+                .getThreshold(),
+            0.0f
+        );
+    }
+
     private Map<String, Integer> getTargetShardPerNodeCount(IndexRoutingTable indexRoutingTable) {
         var counts = new HashMap<String, Integer>();
         for (int shardId = 0; shardId < indexRoutingTable.size(); shardId++) {
@@ -348,22 +367,10 @@ public class BalancedShardsAllocatorTests extends ESAllocationTestCase {
         }
 
         return ClusterState.builder(ClusterName.DEFAULT)
-            .nodes(DiscoveryNodes.builder().add(createNode("node-1")).add(createNode("node-2")))
+            .nodes(DiscoveryNodes.builder().add(newNode("node-1")).add(newNode("node-2")))
             .metadata(metadataBuilder)
             .routingTable(routingTableBuilder)
             .build();
-    }
-
-    private static DiscoveryNode createNode(String nodeId) {
-        return new DiscoveryNode(
-            nodeId,
-            nodeId,
-            UUIDs.randomBase64UUID(random()),
-            buildNewFakeTransportAddress(),
-            Map.of(),
-            DiscoveryNodeRole.roles(),
-            Version.CURRENT
-        );
     }
 
     private void addIndex(

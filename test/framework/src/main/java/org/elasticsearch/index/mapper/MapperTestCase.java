@@ -354,7 +354,7 @@ public abstract class MapperTestCase extends MapperServiceTestCase {
 
         @SuppressWarnings("unchecked") // Syntactic sugar in tests
         T fieldType = (T) mapperService.fieldType("field");
-        assertThat(checker.apply(fieldType).name(), equalTo(metricType));
+        assertThat(checker.apply(fieldType).toString(), equalTo(metricType));
     }
 
     public final void testEmptyName() {
@@ -388,8 +388,7 @@ public abstract class MapperTestCase extends MapperServiceTestCase {
         assertParseMinimalWarnings();
     }
 
-    // TODO make this final once we remove FieldMapperTestCase2
-    public void testMinimalToMaximal() throws IOException {
+    public final void testMinimalToMaximal() throws IOException {
         XContentBuilder orig = JsonXContent.contentBuilder().startObject();
         createMapperService(fieldMapping(this::minimalMapping)).documentMapper().mapping().toXContent(orig, INCLUDE_DEFAULTS);
         orig.endObject();
