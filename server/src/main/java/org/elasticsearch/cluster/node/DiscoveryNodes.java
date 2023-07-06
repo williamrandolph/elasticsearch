@@ -65,6 +65,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
     private final Version minNodeVersion;
     private final IndexVersion maxDataNodeCompatibleIndexVersion;
     private final IndexVersion minSupportedIndexVersion;
+    private final Map<String, Integer> minSystemIndexFormatVersions;
 
     private final Set<String> availableRoles;
 
@@ -81,6 +82,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
         Version minNodeVersion,
         IndexVersion maxDataNodeCompatibleIndexVersion,
         IndexVersion minSupportedIndexVersion,
+        Map<String, Integer> minSystemIndexFormatVersions,
         Set<String> availableRoles
     ) {
         this.nodeLeftGeneration = nodeLeftGeneration;
@@ -98,6 +100,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
         this.maxNodeVersion = maxNodeVersion;
         this.maxDataNodeCompatibleIndexVersion = maxDataNodeCompatibleIndexVersion;
         this.minSupportedIndexVersion = minSupportedIndexVersion;
+        this.minSystemIndexFormatVersions = minSystemIndexFormatVersions;
         assert (localNodeId == null) == (localNode == null);
         this.availableRoles = availableRoles;
     }
@@ -117,6 +120,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
             minNodeVersion,
             maxDataNodeCompatibleIndexVersion,
             minSupportedIndexVersion,
+            minSystemIndexFormatVersions,
             availableRoles
         );
     }
@@ -376,6 +380,10 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
      */
     public IndexVersion getMinSupportedIndexVersion() {
         return minSupportedIndexVersion;
+    }
+
+    public Map<String, Integer> getMinSystemIndexFormatVersions() {
+        return minSystemIndexFormatVersions;
     }
 
     /**
@@ -836,6 +844,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
             Version minNonClientNodeVersion = null;
             IndexVersion maxDataNodeCompatibleIndexVersion = null;
             IndexVersion minSupportedIndexVersion = null;
+            Map<String, Integer> minSystemIndexFormatVersions = new HashMap<>();
             for (Map.Entry<String, DiscoveryNode> nodeEntry : nodes.entrySet()) {
                 DiscoveryNode discoNode = nodeEntry.getValue();
                 Version version = discoNode.getVersion();
@@ -846,6 +855,9 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
                 minNodeVersion = min(minNodeVersion, version);
                 maxNodeVersion = max(maxNodeVersion, version);
                 minSupportedIndexVersion = max(minSupportedIndexVersion, discoNode.getMinIndexVersion());
+                for (Map.Entry<String, Integer> entry : discoNode.getSystemIndexFormatVersions().entrySet()) {
+                    minSystemIndexFormatVersions.merge(entry.getKey(), entry.getValue(), Integer::min);
+                }
             }
 
             final long newNodeLeftGeneration;
@@ -876,6 +888,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
                 Objects.requireNonNullElse(minNodeVersion, Version.CURRENT.minimumCompatibilityVersion()),
                 Objects.requireNonNullElse(maxDataNodeCompatibleIndexVersion, IndexVersion.current()),
                 Objects.requireNonNullElse(minSupportedIndexVersion, IndexVersion.MINIMUM_COMPATIBLE),
+                minSystemIndexFormatVersions,
                 dataNodes.values()
                     .stream()
                     .flatMap(n -> n.getRoles().stream())

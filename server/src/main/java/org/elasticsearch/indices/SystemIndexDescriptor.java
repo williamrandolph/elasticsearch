@@ -457,7 +457,10 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
 
     public Version getMinimumNodeVersion() {
         assert isAutomaticallyManaged() : "Do not request version minimum node version for unmanaged system indices";
-        return minimumNodeVersion;
+        if (indexFormat == 0 || indexFormat == 6) {
+            return Version.CURRENT.minimumCompatibilityVersion();
+        }
+        throw new IllegalStateException("Unexpected index version");
     }
 
     public boolean isAutomaticallyManaged() {
@@ -548,6 +551,18 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
         }
         for (SystemIndexDescriptor prior : priorSystemIndexDescriptors) {
             if (version.onOrAfter(prior.minimumNodeVersion)) {
+                return prior;
+            }
+        }
+        return null;
+    }
+
+    public SystemIndexDescriptor getDescriptorCompatibleWith(int indexFormat) {
+        if (indexFormat == this.indexFormat) {
+            return this;
+        }
+        for (SystemIndexDescriptor prior : priorSystemIndexDescriptors) {
+            if (indexFormat >= prior.indexFormat) {
                 return prior;
             }
         }

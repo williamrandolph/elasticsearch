@@ -143,7 +143,12 @@ public class DiscoveryNodeTests extends ESTestCase {
     }
 
     private void runTestDiscoveryNodeIsRemoteClusterClient(final Settings settings, final boolean expected) {
-        final DiscoveryNode node = DiscoveryNode.createLocal(settings, new TransportAddress(TransportAddress.META_ADDRESS, 9200), "node");
+        final DiscoveryNode node = DiscoveryNode.createLocal(
+            settings,
+            new TransportAddress(TransportAddress.META_ADDRESS, 9200),
+            "node",
+            Map.of()
+        );
         assertThat(node.isRemoteClusterClient(), equalTo(expected));
         if (expected) {
             assertThat(node.getRoles(), hasItem(DiscoveryNodeRole.REMOTE_CLUSTER_CLIENT_ROLE));
@@ -180,7 +185,8 @@ public class DiscoveryNodeTests extends ESTestCase {
             Map.of("test-attr", "val"),
             DiscoveryNodeRole.roles(),
             null,
-            withExternalId ? "test-external-id" : null
+            withExternalId ? "test-external-id" : null,
+            Map.of()
         );
 
         assertThat(

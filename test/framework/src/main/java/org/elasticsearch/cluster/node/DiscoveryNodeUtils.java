@@ -146,7 +146,19 @@ public class DiscoveryNodeUtils {
                 versionInfo = new VersionInformation(version, minIndexVersion, maxIndexVersion);
             }
 
-            return new DiscoveryNode(name, id, ephemeralId, hostName, hostAddress, address, attributes, roles, versionInfo, externalId);
+            return new DiscoveryNode(
+                name,
+                id,
+                ephemeralId,
+                hostName,
+                hostAddress,
+                address,
+                attributes,
+                roles,
+                versionInfo,
+                externalId,
+                Map.of()
+            );
         }
     }
 }

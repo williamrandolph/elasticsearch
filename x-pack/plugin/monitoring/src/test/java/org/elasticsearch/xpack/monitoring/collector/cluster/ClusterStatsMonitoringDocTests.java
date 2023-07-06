@@ -283,7 +283,8 @@ public class ClusterStatsMonitoringDocTests extends BaseMonitoringDocTestCase<Cl
             singletonMap("attr", "value"),
             singleton(DiscoveryNodeRole.MASTER_ROLE),
             null,
-            "_external_id"
+            "_external_id",
+            Map.of()
         );
 
         final ClusterState testClusterState = ClusterState.builder(testClusterName)

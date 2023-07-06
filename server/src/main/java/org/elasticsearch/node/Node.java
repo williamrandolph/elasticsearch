@@ -494,7 +494,6 @@ public class Node implements Closeable {
                     .collect(Collectors.toCollection(LinkedHashSet::new))
             );
             resourcesToClose.add(nodeEnvironment);
-            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId());
 
             ScriptModule.registerClusterSettingsListeners(scriptService, settingsModule.getClusterSettings());
             final NetworkService networkService = new NetworkService(
@@ -559,6 +558,8 @@ public class Node implements Closeable {
             }).toList();
             final SystemIndices systemIndices = new SystemIndices(features);
             final ExecutorSelector executorSelector = systemIndices.getExecutorSelector();
+
+            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId(), systemIndices);
 
             ModulesBuilder modules = new ModulesBuilder();
             final MonitorService monitorService = new MonitorService(settings, nodeEnvironment, threadPool);
@@ -1950,15 +1951,24 @@ public class Node implements Closeable {
         private final SetOnce<DiscoveryNode> localNode = new SetOnce<>();
         private final String persistentNodeId;
         private final Settings settings;
+        private final SystemIndices systemIndices;
 
-        private LocalNodeFactory(Settings settings, String persistentNodeId) {
+        private LocalNodeFactory(Settings settings, String persistentNodeId, SystemIndices systemIndices) {
             this.persistentNodeId = persistentNodeId;
             this.settings = settings;
+            this.systemIndices = systemIndices;
         }
 
         @Override
         public DiscoveryNode apply(BoundTransportAddress boundTransportAddress) {
-            localNode.set(DiscoveryNode.createLocal(settings, boundTransportAddress.publishAddress(), persistentNodeId));
+            localNode.set(
+                DiscoveryNode.createLocal(
+                    settings,
+                    boundTransportAddress.publishAddress(),
+                    persistentNodeId,
+                    systemIndices.getManagedIndexFormats()
+                )
+            );
             return localNode.get();
         }
 

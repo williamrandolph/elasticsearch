@@ -152,6 +152,7 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
     private final SortedSet<DiscoveryNodeRole> roles;
     private final Set<String> roleNames;
     private final String externalId;
+    private final Map<String, Integer> systemIndexFormatVersions;
 
     /**
      * Creates a new {@link DiscoveryNode}
@@ -219,27 +220,27 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         Set<DiscoveryNodeRole> roles,
         @Nullable VersionInformation versionInfo
     ) {
-        this(nodeName, nodeId, ephemeralId, hostName, hostAddress, address, attributes, roles, versionInfo, null);
+        this(nodeName, nodeId, ephemeralId, hostName, hostAddress, address, attributes, roles, versionInfo, null, Map.of());
     }
 
     /**
      * Creates a new {@link DiscoveryNode}.
      * <p>
      * <b>Note:</b> if the version of the node is unknown {@link Version#minimumCompatibilityVersion()} should be used for the current
-     * version. it corresponds to the minimum version this elasticsearch version can communicate with. If a higher version is used
-     * the node might not be able to communicate with the remote node. After initial handshakes node versions will be discovered
-     * and updated.
+     * version. it corresponds to the minimum version this elasticsearch version can communicate with. If a higher version is used the node
+     * might not be able to communicate with the remote node. After initial handshakes node versions will be discovered and updated.
      * </p>
      *
-     * @param nodeName         the nodes name
-     * @param nodeId           the nodes unique persistent id
-     * @param ephemeralId      the nodes unique ephemeral id
-     * @param hostAddress      the nodes host address
-     * @param address          the nodes transport address
-     * @param attributes       node attributes
-     * @param roles            node roles
-     * @param versionInfo      node version info
-     * @param externalId       the external id used to identify this node by external systems
+     * @param nodeName                  the nodes name
+     * @param nodeId                    the nodes unique persistent id
+     * @param ephemeralId               the nodes unique ephemeral id
+     * @param hostAddress               the nodes host address
+     * @param address                   the nodes transport address
+     * @param attributes                node attributes
+     * @param roles                     node roles
+     * @param versionInfo               node version info
+     * @param externalId                the external id used to identify this node by external systems
+     * @param systemIndexFormatVersions system index version numbers
      */
     public DiscoveryNode(
         @Nullable String nodeName,
@@ -251,7 +252,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         Map<String, String> attributes,
         Set<DiscoveryNodeRole> roles,
         @Nullable VersionInformation versionInfo,
-        @Nullable String externalId
+        @Nullable String externalId,
+        @Nullable Map<String, Integer> systemIndexFormatVersions
     ) {
         if (nodeName != null) {
             this.nodeName = nodeStringDeduplicator.deduplicate(nodeName);
@@ -278,10 +280,16 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         this.roles = Collections.unmodifiableSortedSet(sortedRoles);
         this.roleNames = Set.of(roleNames);
         this.externalId = Objects.requireNonNullElse(externalId, this.nodeName);
+        this.systemIndexFormatVersions = Objects.requireNonNullElse(systemIndexFormatVersions, Map.of());
     }
 
     /** Creates a DiscoveryNode representing the local node. */
-    public static DiscoveryNode createLocal(Settings settings, TransportAddress publishAddress, String nodeId) {
+    public static DiscoveryNode createLocal(
+        Settings settings,
+        TransportAddress publishAddress,
+        String nodeId,
+        Map<String, Integer> systemIndexFormatVersions
+    ) {
         Map<String, String> attributes = Node.NODE_ATTRIBUTES.getAsMap(settings);
         Set<DiscoveryNodeRole> roles = getRolesFromSettings(settings);
         return new DiscoveryNode(
@@ -294,7 +302,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             attributes,
             roles,
             null,
-            Node.NODE_EXTERNAL_ID_SETTING.get(settings)
+            Node.NODE_EXTERNAL_ID_SETTING.get(settings),
+            systemIndexFormatVersions
         );
     }
 
@@ -362,6 +371,11 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             this.externalId = nodeName;
         }
         this.roleNames = Set.of(roleNames);
+        if (in.getTransportVersion().onOrAfter(TransportVersion.V_8_500_027)) { // TODO: version bump
+            this.systemIndexFormatVersions = in.readImmutableMap(StreamInput::readInt);
+        } else {
+            this.systemIndexFormatVersions = Map.of();
+        }
     }
 
     /**
@@ -397,6 +411,9 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         }
         if (out.getTransportVersion().onOrAfter(EXTERNAL_ID_VERSION)) {
             out.writeString(externalId);
+        }
+        if (out.getTransportVersion().onOrAfter(TransportVersion.V_8_500_027)) { // TODO: version bump
+            out.writeMap(systemIndexFormatVersions, StreamOutput::writeString, StreamOutput::writeInt);
         }
     }
 
@@ -511,6 +528,10 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         return versionInfo.maxIndexVersion();
     }
 
+    public Map<String, Integer> getSystemIndexFormatVersions() {
+        return this.systemIndexFormatVersions;
+    }
+
     public String getHostName() {
         return this.hostName;
     }
@@ -622,7 +643,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             getAttributes(),
             getRoles(),
             getVersionInformation(),
-            getExternalId()
+            getExternalId(),
+            Map.of()
         );
     }
 

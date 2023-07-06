@@ -8,6 +8,8 @@
 
 package org.elasticsearch.indices;
 
+import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.synonyms.SynonymsAPI;
 import org.elasticsearch.test.ESTestCase;
 
@@ -253,5 +255,38 @@ public class SystemIndicesTests extends ESTestCase {
                 containsString(firstFeature)
             )
         );
+    }
+
+    public void testGetManagedIndexFormats() {
+        // unmanaged index should not appear in the map
+        SystemIndices systemIndices = new SystemIndices(
+            List.of(
+                new SystemIndices.Feature(
+                    "test",
+                    "unmanaged",
+                    List.of(SystemIndexDescriptorUtils.createUnmanaged(".test-*", "test descriptor"))
+                ),
+                new SystemIndices.Feature(
+                    "test-managed",
+                    "managed",
+                    List.of(
+                        SystemIndexDescriptor.builder()
+                            .setIndexPattern(".managed-*")
+                            .setPrimaryIndex(".managed-1")
+                            .setIndexFormat(4)
+                            .setSettings(Settings.builder().put(IndexMetadata.INDEX_FORMAT_SETTING.getKey(), 4).build())
+                            .setMappings("{\"_meta\":{\"the_version\":\"8.8.0\"}}")
+                            .setVersionMetaKey("the_version")
+                            .setOrigin("test")
+                            .build()
+                    )
+                )
+            )
+        );
+
+        Map<String, Integer> expected = SynonymsAPI.isEnabled()
+            ? Map.of(".tasks", 0, ".managed-1", 4, ".synonyms-1", 0)
+            : Map.of(".tasks", 0, ".managed-1", 4);
+        assertThat(systemIndices.getManagedIndexFormats(), equalTo(expected));
     }
 }

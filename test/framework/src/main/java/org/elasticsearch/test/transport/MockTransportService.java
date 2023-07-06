@@ -203,7 +203,8 @@ public class MockTransportService extends TransportService {
             (boundAddress) -> DiscoveryNode.createLocal(
                 settings,
                 boundAddress.publishAddress(),
-                settings.get(Node.NODE_NAME_SETTING.getKey(), UUIDs.randomBase64UUID())
+                settings.get(Node.NODE_NAME_SETTING.getKey(), UUIDs.randomBase64UUID()),
+                Map.of()
             ),
             clusterSettings,
             createTaskManager(settings, threadPool, Set.of(), Tracer.NOOP)

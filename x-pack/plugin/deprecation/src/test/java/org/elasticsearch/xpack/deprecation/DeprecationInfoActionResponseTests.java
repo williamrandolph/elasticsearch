@@ -100,7 +100,8 @@ public class DeprecationInfoActionResponseTests extends AbstractWireSerializingT
         DiscoveryNode discoveryNode = DiscoveryNode.createLocal(
             Settings.EMPTY,
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            "test"
+            "test",
+            Map.of()
         );
         ClusterState state = ClusterState.builder(ClusterName.DEFAULT).metadata(metadata).build();
         IndexNameExpressionResolver resolver = TestIndexNameExpressionResolver.newInstance();

@@ -124,8 +124,22 @@ public class ResponseCollectorServiceTests extends ESTestCase {
         ClusterState previousState = ClusterState.builder(new ClusterName("cluster"))
             .nodes(
                 DiscoveryNodes.builder()
-                    .add(DiscoveryNode.createLocal(Settings.EMPTY, new TransportAddress(TransportAddress.META_ADDRESS, 9200), "node1"))
-                    .add(DiscoveryNode.createLocal(Settings.EMPTY, new TransportAddress(TransportAddress.META_ADDRESS, 9201), "node2"))
+                    .add(
+                        DiscoveryNode.createLocal(
+                            Settings.EMPTY,
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9200),
+                            "node1",
+                            Map.of()
+                        )
+                    )
+                    .add(
+                        DiscoveryNode.createLocal(
+                            Settings.EMPTY,
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9201),
+                            "node2",
+                            Map.of()
+                        )
+                    )
             )
             .build();
         ClusterState newState = ClusterState.builder(previousState)

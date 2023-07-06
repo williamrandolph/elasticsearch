@@ -108,7 +108,9 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
             String nodeName = "node_" + i;
             int nodePort = 9300 + i;
             Settings nodeSettings = Settings.builder().put(validNodeSettings).put(Node.NODE_NAME_SETTING.getKey(), nodeName).build();
-            nodes.add(DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId));
+            nodes.add(
+                DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId, Map.of())
+            );
             validNodeIds.add(nodeId);
         }
 
@@ -141,7 +143,9 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
                 .put(Node.NODE_NAME_SETTING.getKey(), nodeName)
                 .put(Node.NODE_ATTRIBUTES.getKey() + nodeAttr.getKey(), nodeAttr.getValue())
                 .build();
-            nodes.add(DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId));
+            nodes.add(
+                DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId, Map.of())
+            );
             validNodeIds.add(nodeId);
         }
 
@@ -180,7 +184,8 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
                 DiscoveryNode.createLocal(
                     nodeSettingsBuilder.build(),
                     new TransportAddress(TransportAddress.META_ADDRESS, nodePort),
-                    nodeId
+                    nodeId,
+                    Map.of()
                 )
             );
         }
@@ -202,7 +207,12 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
         int nodePort = 9300;
         Builder nodeSettingsBuilder = Settings.builder();
         nodes.add(
-            DiscoveryNode.createLocal(nodeSettingsBuilder.build(), new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId)
+            DiscoveryNode.createLocal(
+                nodeSettingsBuilder.build(),
+                new TransportAddress(TransportAddress.META_ADDRESS, nodePort),
+                nodeId,
+                Map.of()
+            )
         );
 
         Settings clusterSettings = Settings.builder().put("cluster.routing.allocation.exclude._id", "node_id_0").build();
@@ -248,7 +258,8 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
                 DiscoveryNode.createLocal(
                     nodeSettingsBuilder.build(),
                     new TransportAddress(TransportAddress.META_ADDRESS, nodePort),
-                    nodeId
+                    nodeId,
+                    Map.of()
                 )
             );
         }
@@ -282,7 +293,9 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
                 .put(Node.NODE_NAME_SETTING.getKey(), nodeName)
                 .put(Node.NODE_ATTRIBUTES.getKey() + nodeAttr.getKey(), nodeAttr.getValue())
                 .build();
-            nodes.add(DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId));
+            nodes.add(
+                DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId, Map.of())
+            );
             validNodeIds.add(nodeId);
         }
 
@@ -351,7 +364,9 @@ public class SetSingleNodeAllocateStepTests extends AbstractStepTestCase<SetSing
                 .put(Node.NODE_NAME_SETTING.getKey(), nodeName)
                 .put(Node.NODE_ATTRIBUTES.getKey() + nodeAttr.getKey(), nodeAttr.getValue())
                 .build();
-            nodes.add(DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId));
+            nodes.add(
+                DiscoveryNode.createLocal(nodeSettings, new TransportAddress(TransportAddress.META_ADDRESS, nodePort), nodeId, Map.of())
+            );
         }
 
         Map<String, IndexMetadata> indices = Map.of(index.getName(), indexMetadata);
