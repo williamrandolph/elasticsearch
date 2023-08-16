@@ -365,8 +365,12 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             this.externalId = nodeName;
         }
         this.roleNames = Set.of(roleNames);
-        // TODO[wrb]: add systemindexmappingsversion map to stream in/out
-        this.systemIndexMappingsVersionMap = Map.of();
+        // TODO[wrb]: transport version bump
+        if (in.getTransportVersion().onOrAfter(TransportVersion.current())) {
+            this.systemIndexMappingsVersionMap = in.readMap(SystemIndexDescriptor.MappingsVersion::new);
+        } else {
+            this.systemIndexMappingsVersionMap = Map.of();
+        }
     }
 
     /**
@@ -402,6 +406,13 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         }
         if (out.getTransportVersion().onOrAfter(EXTERNAL_ID_VERSION)) {
             out.writeString(externalId);
+        }
+        if (out.getTransportVersion().onOrAfter(TransportVersion.current())) {
+            out.writeMap(
+                this.systemIndexMappingsVersionMap,
+                StreamOutput::writeString,
+                (vOut, mappingsVersion) -> mappingsVersion.writeTo(vOut)
+            );
         }
     }
 

@@ -14,7 +14,9 @@ import org.elasticsearch.TransportVersion;
 import org.elasticsearch.Version;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.index.IndexVersion;
+import org.elasticsearch.indices.SystemIndexDescriptor;
 import org.elasticsearch.test.ESTestCase;
+import org.elasticsearch.test.NodeRoles;
 import org.elasticsearch.test.VersionUtils;
 
 import java.io.IOException;
@@ -296,6 +298,50 @@ public class DiscoveryNodesTests extends ESTestCase {
         assertThat(delta.removed(), equalTo(removedNodes.isEmpty() == false));
         assertThat(delta.removedNodes(), containsInAnyOrder(removedNodes.stream().toList().toArray()));
         assertThat(delta.removedNodes().size(), equalTo(removedNodes.size()));
+    }
+
+    /**
+     * A contrived example where the minimum versions for different indices are on different nodes.
+     * In reality, the versions on the newer node should always be equal to or greater than those on
+     * the older node.
+     */
+    public void testMinSystemIndexMappingsVersions() {
+        DiscoveryNode disco1 = DiscoveryNode.createLocal(
+            NodeRoles.masterNode(settings(IndexVersion.current()).build()),
+            new TransportAddress(TransportAddress.META_ADDRESS, 9301),
+            "node_1",
+            Map.of(
+                ".system-index-1-*",
+                new SystemIndexDescriptor.MappingsVersion(3, 0),
+                ".system-index-2-*",
+                new SystemIndexDescriptor.MappingsVersion(1, 0)
+            )
+        );
+        DiscoveryNode disco2 = DiscoveryNode.createLocal(
+            NodeRoles.masterNode(settings(IndexVersion.current()).build()),
+            new TransportAddress(TransportAddress.META_ADDRESS, 9302),
+            "node_2",
+            Map.of(
+                ".system-index-1-*",
+                new SystemIndexDescriptor.MappingsVersion(1, 0),
+                ".system-index-2-*",
+                new SystemIndexDescriptor.MappingsVersion(3, 0)
+            )
+        );
+
+        DiscoveryNodes discoveryNodes = DiscoveryNodes.builder().add(disco1).add(disco2).build();
+
+        assertThat(
+            discoveryNodes.getMinSystemIndexMappingsVersions(),
+            equalTo(
+                Map.of(
+                    ".system-index-1-*",
+                    new SystemIndexDescriptor.MappingsVersion(1, 0),
+                    ".system-index-2-*",
+                    new SystemIndexDescriptor.MappingsVersion(1, 0)
+                )
+            )
+        );
     }
 
     private static AtomicInteger idGenerator = new AtomicInteger();

@@ -376,6 +376,10 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
         return maxNodeVersion;
     }
 
+    public Map<String, SystemIndexDescriptor.MappingsVersion> getMinSystemIndexMappingsVersions() {
+        return minSystemIndexMappingsVersions;
+    }
+
     /**
      * Returns the minimum index version supported by all nodes in the cluster
      */
@@ -854,11 +858,7 @@ public class DiscoveryNodes implements Iterable<DiscoveryNode>, SimpleDiffable<D
                 minSupportedIndexVersion = max(minSupportedIndexVersion, discoNode.getMinIndexVersion());
                 for (Map.Entry<String, SystemIndexDescriptor.MappingsVersion> entry : discoNode.getSystemIndexMappingsVersionMap()
                     .entrySet()) {
-                    minSystemIndexMappingsVersions.merge(
-                        entry.getKey(),
-                        entry.getValue(),
-                        (v1, v2) -> v1.version() < v2.version() ? v1 : v2
-                    );
+                    minSystemIndexMappingsVersions.merge(entry.getKey(), entry.getValue(), SystemIndexDescriptor.MappingsVersion::min);
                 }
             }
 
