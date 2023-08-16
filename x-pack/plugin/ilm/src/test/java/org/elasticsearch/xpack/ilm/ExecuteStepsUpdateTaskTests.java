@@ -156,7 +156,8 @@ public class ExecuteStepsUpdateTaskTests extends ESTestCase {
         DiscoveryNode masterNode = DiscoveryNode.createLocal(
             NodeRoles.masterNode(settings(IndexVersion.current()).build()),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
         clusterState = ClusterState.builder(ClusterName.DEFAULT)
             .metadata(metadata)

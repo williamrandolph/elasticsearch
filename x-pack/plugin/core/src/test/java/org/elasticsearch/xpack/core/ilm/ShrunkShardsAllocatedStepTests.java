@@ -24,6 +24,8 @@ import org.elasticsearch.test.NodeRoles;
 import org.elasticsearch.xpack.core.ilm.ClusterStateWaitStep.Result;
 import org.elasticsearch.xpack.core.ilm.Step.StepKey;
 
+import java.util.Map;
+
 import static org.elasticsearch.xpack.core.ilm.ShrinkIndexNameSupplier.SHRUNKEN_INDEX_PREFIX;
 
 public class ShrunkShardsAllocatedStepTests extends AbstractStepTestCase<ShrunkShardsAllocatedStep> {
@@ -80,7 +82,8 @@ public class ShrunkShardsAllocatedStepTests extends AbstractStepTestCase<ShrunkS
         DiscoveryNode masterNode = DiscoveryNode.createLocal(
             NodeRoles.masterNode(settings(IndexVersion.current()).build()),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
 
         IndexRoutingTable.Builder builder = IndexRoutingTable.builder(shrinkIndex);
@@ -124,7 +127,8 @@ public class ShrunkShardsAllocatedStepTests extends AbstractStepTestCase<ShrunkS
         DiscoveryNode masterNode = DiscoveryNode.createLocal(
             NodeRoles.masterNode(settings(IndexVersion.current()).build()),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
 
         IndexRoutingTable.Builder builder = IndexRoutingTable.builder(shrinkIndex);
@@ -160,7 +164,8 @@ public class ShrunkShardsAllocatedStepTests extends AbstractStepTestCase<ShrunkS
         DiscoveryNode masterNode = DiscoveryNode.createLocal(
             NodeRoles.masterNode(settings(IndexVersion.current()).build()),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
         ClusterState clusterState = ClusterState.builder(ClusterName.DEFAULT)
             .metadata(metadata)

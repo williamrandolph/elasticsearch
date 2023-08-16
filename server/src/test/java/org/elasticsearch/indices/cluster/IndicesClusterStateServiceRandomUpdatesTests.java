@@ -518,7 +518,7 @@ public class IndicesClusterStateServiceRandomUpdatesTests extends AbstractIndice
             mock(Transport.class),
             threadPool,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR,
-            boundAddress -> DiscoveryNode.createLocal(settings, boundAddress.publishAddress(), UUIDs.randomBase64UUID()),
+            boundAddress -> DiscoveryNode.createLocal(settings, boundAddress.publishAddress(), UUIDs.randomBase64UUID(), Map.of()),
             null,
             Collections.emptySet()
         );

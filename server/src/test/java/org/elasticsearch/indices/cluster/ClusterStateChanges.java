@@ -218,7 +218,7 @@ public class ClusterStateChanges {
             transport,
             threadPool,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR,
-            boundAddress -> DiscoveryNode.createLocal(SETTINGS, boundAddress.publishAddress(), UUIDs.randomBase64UUID()),
+            boundAddress -> DiscoveryNode.createLocal(SETTINGS, boundAddress.publishAddress(), UUIDs.randomBase64UUID(), Map.of()),
             clusterSettings,
             Collections.emptySet(),
             Tracer.NOOP

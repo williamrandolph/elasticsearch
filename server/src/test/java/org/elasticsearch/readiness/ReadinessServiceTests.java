@@ -40,6 +40,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 public class ReadinessServiceTests extends ESTestCase implements ReadinessClientProbe {
@@ -160,7 +161,14 @@ public class ReadinessServiceTests extends ESTestCase implements ReadinessClient
         ClusterState previousState = ClusterState.builder(new ClusterName("cluster"))
             .nodes(
                 DiscoveryNodes.builder()
-                    .add(DiscoveryNode.createLocal(Settings.EMPTY, new TransportAddress(TransportAddress.META_ADDRESS, 9201), "node2"))
+                    .add(
+                        DiscoveryNode.createLocal(
+                            Settings.EMPTY,
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9201),
+                            "node2",
+                            Map.of()
+                        )
+                    )
             )
             .build();
 
@@ -194,7 +202,14 @@ public class ReadinessServiceTests extends ESTestCase implements ReadinessClient
         ClusterState previousState = ClusterState.builder(new ClusterName("cluster"))
             .nodes(
                 DiscoveryNodes.builder()
-                    .add(DiscoveryNode.createLocal(Settings.EMPTY, new TransportAddress(TransportAddress.META_ADDRESS, 9201), "node2"))
+                    .add(
+                        DiscoveryNode.createLocal(
+                            Settings.EMPTY,
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9201),
+                            "node2",
+                            Map.of()
+                        )
+                    )
             )
             .build();
 

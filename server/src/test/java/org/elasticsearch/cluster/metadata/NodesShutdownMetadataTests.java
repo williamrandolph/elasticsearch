@@ -90,7 +90,7 @@ public class NodesShutdownMetadataTests extends ChunkedToXContentDiffableSeriali
             );
 
             DiscoveryNodes.Builder nodes = DiscoveryNodes.builder();
-            nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "this_node"));
+            nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "this_node", Map.of()));
             nodes.localNodeId("this_node");
             nodes.masterNodeId("this_node");
 

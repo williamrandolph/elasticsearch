@@ -499,7 +499,17 @@ public class Node implements Closeable {
                     .collect(Collectors.toCollection(LinkedHashSet::new))
             );
             resourcesToClose.add(nodeEnvironment);
-            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId());
+
+            final List<SystemIndices.Feature> features = pluginsService.filterPlugins(SystemIndexPlugin.class).stream().map(plugin -> {
+                SystemIndices.validateFeatureName(plugin.getFeatureName(), plugin.getClass().getCanonicalName());
+                return SystemIndices.Feature.fromSystemIndexPlugin(plugin, settings);
+            }).toList();
+            final SystemIndices systemIndices = new SystemIndices(features);
+            final ExecutorSelector executorSelector = systemIndices.getExecutorSelector();
+
+            // Give local node factory information about system index mappings versions,
+            // which don't change during runtime but are local to a node.
+            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId(), systemIndices);
 
             ScriptModule.registerClusterSettingsListeners(scriptService, settingsModule.getClusterSettings());
             final NetworkService networkService = new NetworkService(
@@ -562,12 +572,6 @@ public class Node implements Closeable {
                     HealthNodeTaskExecutor.getNamedXContentParsers().stream()
                 ).flatMap(Function.identity()).collect(toList())
             );
-            final List<SystemIndices.Feature> features = pluginsService.filterPlugins(SystemIndexPlugin.class).stream().map(plugin -> {
-                SystemIndices.validateFeatureName(plugin.getFeatureName(), plugin.getClass().getCanonicalName());
-                return SystemIndices.Feature.fromSystemIndexPlugin(plugin, settings);
-            }).toList();
-            final SystemIndices systemIndices = new SystemIndices(features);
-            final ExecutorSelector executorSelector = systemIndices.getExecutorSelector();
 
             ModulesBuilder modules = new ModulesBuilder();
             final MonitorService monitorService = new MonitorService(settings, nodeEnvironment, threadPool);
@@ -1993,15 +1997,24 @@ public class Node implements Closeable {
         private final SetOnce<DiscoveryNode> localNode = new SetOnce<>();
         private final String persistentNodeId;
         private final Settings settings;
+        private final SystemIndices systemIndices;
 
-        private LocalNodeFactory(Settings settings, String persistentNodeId) {
+        private LocalNodeFactory(Settings settings, String persistentNodeId, SystemIndices systemIndices) {
             this.persistentNodeId = persistentNodeId;
             this.settings = settings;
+            this.systemIndices = systemIndices;
         }
 
         @Override
         public DiscoveryNode apply(BoundTransportAddress boundTransportAddress) {
-            localNode.set(DiscoveryNode.createLocal(settings, boundTransportAddress.publishAddress(), persistentNodeId));
+            localNode.set(
+                DiscoveryNode.createLocal(
+                    settings,
+                    boundTransportAddress.publishAddress(),
+                    persistentNodeId,
+                    systemIndices.getMappingsVersions()
+                )
+            );
             return localNode.get();
         }
 

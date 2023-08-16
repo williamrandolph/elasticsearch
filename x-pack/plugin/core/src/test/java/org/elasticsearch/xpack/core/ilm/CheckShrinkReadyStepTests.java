@@ -493,14 +493,16 @@ public class CheckShrinkReadyStepTests extends AbstractStepTestCase<CheckShrinkR
                             DiscoveryNode.createLocal(
                                 Settings.builder().put(node1Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node1").build(),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9200),
-                                "node1"
+                                "node1",
+                                Map.of()
                             )
                         )
                         .add(
                             DiscoveryNode.createLocal(
                                 Settings.builder().put(node2Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node2").build(),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9201),
-                                "node2"
+                                "node2",
+                                Map.of()
                             )
                         )
                 )
@@ -572,14 +574,16 @@ public class CheckShrinkReadyStepTests extends AbstractStepTestCase<CheckShrinkR
                             DiscoveryNode.createLocal(
                                 Settings.builder().put(node1Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node1").build(),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9200),
-                                "node1"
+                                "node1",
+                                Map.of()
                             )
                         )
                         .add(
                             DiscoveryNode.createLocal(
                                 Settings.builder().put(node2Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node2").build(),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9201),
-                                "node2"
+                                "node2",
+                                Map.of()
                             )
                         )
                 )
@@ -622,14 +626,16 @@ public class CheckShrinkReadyStepTests extends AbstractStepTestCase<CheckShrinkR
                         DiscoveryNode.createLocal(
                             Settings.builder().put(node1Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node1").build(),
                             new TransportAddress(TransportAddress.META_ADDRESS, 9200),
-                            "node1"
+                            "node1",
+                            Map.of()
                         )
                     )
                     .add(
                         DiscoveryNode.createLocal(
                             Settings.builder().put(node2Settings.build()).put(Node.NODE_NAME_SETTING.getKey(), "node2").build(),
                             new TransportAddress(TransportAddress.META_ADDRESS, 9201),
-                            "node2"
+                            "node2",
+                            Map.of()
                         )
                     )
             )

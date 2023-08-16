@@ -100,7 +100,8 @@ public class IndexLifecycleServiceTests extends ESTestCase {
         masterNode = DiscoveryNode.createLocal(
             NodeRoles.masterNode(settings(IndexVersion.current()).build()),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
         now = randomNonNegativeLong();
         Clock clock = Clock.fixed(Instant.ofEpochMilli(now), ZoneId.of(randomFrom(ZoneId.getAvailableZoneIds())));
@@ -596,14 +597,16 @@ public class IndexLifecycleServiceTests extends ESTestCase {
                             DiscoveryNode.createLocal(
                                 NodeRoles.masterNode(settings(IndexVersion.current()).build()),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9301),
-                                "regular_node"
+                                "regular_node",
+                                Map.of()
                             )
                         )
                         .add(
                             DiscoveryNode.createLocal(
                                 NodeRoles.masterNode(settings(IndexVersion.current()).build()),
                                 new TransportAddress(TransportAddress.META_ADDRESS, 9302),
-                                "shutdown_node"
+                                "shutdown_node",
+                                Map.of()
                             )
                         )
                         .build()

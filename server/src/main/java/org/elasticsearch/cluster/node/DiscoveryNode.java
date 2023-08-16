@@ -20,6 +20,7 @@ import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.common.util.StringLiteralDeduplicator;
 import org.elasticsearch.core.Nullable;
 import org.elasticsearch.index.IndexVersion;
+import org.elasticsearch.indices.SystemIndexDescriptor;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.xcontent.ToXContentFragment;
 import org.elasticsearch.xcontent.XContentBuilder;
@@ -145,6 +146,7 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
     private final SortedSet<DiscoveryNodeRole> roles;
     private final Set<String> roleNames;
     private final String externalId;
+    private final Map<String, SystemIndexDescriptor.MappingsVersion> systemIndexMappingsVersionMap;
 
     /**
      * Creates a new {@link DiscoveryNode}
@@ -212,27 +214,27 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         Set<DiscoveryNodeRole> roles,
         @Nullable VersionInformation versionInfo
     ) {
-        this(nodeName, nodeId, ephemeralId, hostName, hostAddress, address, attributes, roles, versionInfo, null);
+        this(nodeName, nodeId, ephemeralId, hostName, hostAddress, address, attributes, roles, versionInfo, null, Map.of());
     }
 
     /**
      * Creates a new {@link DiscoveryNode}.
      * <p>
      * <b>Note:</b> if the version of the node is unknown {@link Version#minimumCompatibilityVersion()} should be used for the current
-     * version. it corresponds to the minimum version this elasticsearch version can communicate with. If a higher version is used
-     * the node might not be able to communicate with the remote node. After initial handshakes node versions will be discovered
-     * and updated.
+     * version. it corresponds to the minimum version this elasticsearch version can communicate with. If a higher version is used the node
+     * might not be able to communicate with the remote node. After initial handshakes node versions will be discovered and updated.
      * </p>
      *
-     * @param nodeName         the nodes name
-     * @param nodeId           the nodes unique persistent id
-     * @param ephemeralId      the nodes unique ephemeral id
-     * @param hostAddress      the nodes host address
-     * @param address          the nodes transport address
-     * @param attributes       node attributes
-     * @param roles            node roles
-     * @param versionInfo      node version info
-     * @param externalId       the external id used to identify this node by external systems
+     * @param nodeName                    the nodes name
+     * @param nodeId                      the nodes unique persistent id
+     * @param ephemeralId                 the nodes unique ephemeral id
+     * @param hostAddress                 the nodes host address
+     * @param address                     the nodes transport address
+     * @param attributes                  node attributes
+     * @param roles                       node roles
+     * @param versionInfo                 node version info
+     * @param externalId                  the external id used to identify this node by external systems
+     * @param systemIndexMappingsVersions
      */
     public DiscoveryNode(
         @Nullable String nodeName,
@@ -244,7 +246,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         Map<String, String> attributes,
         Set<DiscoveryNodeRole> roles,
         @Nullable VersionInformation versionInfo,
-        @Nullable String externalId
+        @Nullable String externalId,
+        Map<String, SystemIndexDescriptor.MappingsVersion> systemIndexMappingsVersions
     ) {
         if (nodeName != null) {
             this.nodeName = nodeStringDeduplicator.deduplicate(nodeName);
@@ -271,10 +274,16 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         this.roles = Collections.unmodifiableSortedSet(sortedRoles);
         this.roleNames = Set.of(roleNames);
         this.externalId = Objects.requireNonNullElse(externalId, this.nodeName);
+        this.systemIndexMappingsVersionMap = Objects.requireNonNullElse(systemIndexMappingsVersions, Map.of());
     }
 
     /** Creates a DiscoveryNode representing the local node. */
-    public static DiscoveryNode createLocal(Settings settings, TransportAddress publishAddress, String nodeId) {
+    public static DiscoveryNode createLocal(
+        Settings settings,
+        TransportAddress publishAddress,
+        String nodeId,
+        Map<String, SystemIndexDescriptor.MappingsVersion> mappingsVersionMap
+    ) {
         Map<String, String> attributes = Node.NODE_ATTRIBUTES.getAsMap(settings);
         Set<DiscoveryNodeRole> roles = getRolesFromSettings(settings);
         return new DiscoveryNode(
@@ -287,7 +296,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             attributes,
             roles,
             null,
-            Node.NODE_EXTERNAL_ID_SETTING.get(settings)
+            Node.NODE_EXTERNAL_ID_SETTING.get(settings),
+            mappingsVersionMap
         );
     }
 
@@ -355,6 +365,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             this.externalId = nodeName;
         }
         this.roleNames = Set.of(roleNames);
+        // TODO[wrb]: add systemindexmappingsversion map to stream in/out
+        this.systemIndexMappingsVersionMap = Map.of();
     }
 
     /**
@@ -512,6 +524,10 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         return this.hostAddress;
     }
 
+    public Map<String, SystemIndexDescriptor.MappingsVersion> getSystemIndexMappingsVersionMap() {
+        return this.systemIndexMappingsVersionMap;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -615,7 +631,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
             getAttributes(),
             getRoles(),
             getVersionInformation(),
-            getExternalId()
+            getExternalId(),
+            Map.of()
         );
     }
 

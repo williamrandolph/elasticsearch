@@ -47,6 +47,7 @@ import org.junit.BeforeClass;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -515,7 +516,7 @@ public class PersistentTasksClusterServiceTests extends ESTestCase {
         // Now simulate the node ceasing to be the master
         builder = ClusterState.builder(clusterState);
         nodes = DiscoveryNodes.builder(clusterState.nodes());
-        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "a_new_master_node"));
+        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "a_new_master_node", Map.of()));
         nodes.masterNodeId("a_new_master_node");
         ClusterState nonMasterClusterState = builder.nodes(nodes).build();
         event = new ClusterChangedEvent("test", nonMasterClusterState, clusterState);
@@ -1037,7 +1038,7 @@ public class PersistentTasksClusterServiceTests extends ESTestCase {
         }
 
         DiscoveryNodes.Builder nodes = DiscoveryNodes.builder();
-        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "this_node"));
+        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), "this_node", Map.of()));
         nodes.localNodeId("this_node");
         nodes.masterNodeId("this_node");
 

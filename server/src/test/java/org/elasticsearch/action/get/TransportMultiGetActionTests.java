@@ -80,7 +80,8 @@ public class TransportMultiGetActionTests extends ESTestCase {
             boundAddress -> DiscoveryNode.createLocal(
                 Settings.builder().put("node.name", "node1").build(),
                 boundAddress.publishAddress(),
-                randomBase64UUID()
+                randomBase64UUID(),
+                Map.of()
             ),
             null,
             emptySet()

@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -82,7 +83,7 @@ public class PersistentTasksNodeServiceTests extends ESTestCase {
         state.metadata(Metadata.builder().generateClusterUuidIfNeeded());
         state.routingTable(RoutingTable.builder().build());
         DiscoveryNodes.Builder nodes = DiscoveryNodes.builder();
-        nodes.add(DiscoveryNode.createLocal(settings, buildNewFakeTransportAddress(), "this_node"));
+        nodes.add(DiscoveryNode.createLocal(settings, buildNewFakeTransportAddress(), "this_node", Map.of()));
         for (int i = 0; i < nonLocalNodesCount; i++) {
             nodes.add(DiscoveryNodeUtils.create("other_node_" + i));
         }

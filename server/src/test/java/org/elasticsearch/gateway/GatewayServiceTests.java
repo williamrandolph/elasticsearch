@@ -26,6 +26,8 @@ import org.elasticsearch.tasks.TaskManager;
 import org.elasticsearch.test.ESTestCase;
 import org.hamcrest.Matchers;
 
+import java.util.Map;
+
 import static org.elasticsearch.gateway.GatewayService.STATE_NOT_RECOVERED_BLOCK;
 import static org.elasticsearch.test.NodeRoles.masterNode;
 import static org.hamcrest.CoreMatchers.not;
@@ -73,7 +75,8 @@ public class GatewayServiceTests extends ESTestCase {
         DiscoveryNode masterNode = DiscoveryNode.createLocal(
             settings(IndexVersion.current()).put(masterNode()).build(),
             new TransportAddress(TransportAddress.META_ADDRESS, 9300),
-            nodeId
+            nodeId,
+            Map.of()
         );
         ClusterState stateWithBlock = ClusterState.builder(ClusterName.DEFAULT)
             .nodes(DiscoveryNodes.builder().localNodeId(nodeId).masterNodeId(nodeId).add(masterNode).build())

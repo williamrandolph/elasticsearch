@@ -33,6 +33,7 @@ import org.junit.BeforeClass;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.elasticsearch.persistent.PersistentTasksExecutor.NO_NODE_FOUND;
 import static org.elasticsearch.test.ClusterServiceUtils.createClusterService;
@@ -157,7 +158,7 @@ public class HealthNodeExecutorTests extends ESTestCase {
         Metadata.Builder metadata = Metadata.builder();
 
         DiscoveryNodes.Builder nodes = DiscoveryNodes.builder();
-        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), localNodeId));
+        nodes.add(DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), localNodeId, Map.of()));
         nodes.localNodeId(localNodeId);
         nodes.masterNodeId(localNodeId);
 

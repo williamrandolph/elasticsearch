@@ -101,7 +101,12 @@ public class DataTierTests extends ESTestCase {
     }
 
     public void testDefaultRolesImpliesTieredDataRoles() {
-        final DiscoveryNode node = DiscoveryNode.createLocal(Settings.EMPTY, buildNewFakeTransportAddress(), randomAlphaOfLength(8));
+        final DiscoveryNode node = DiscoveryNode.createLocal(
+            Settings.EMPTY,
+            buildNewFakeTransportAddress(),
+            randomAlphaOfLength(8),
+            Map.of()
+        );
         assertThat(node.getRoles(), hasItem(DiscoveryNodeRole.DATA_CONTENT_NODE_ROLE));
         assertThat(node.getRoles(), hasItem(DiscoveryNodeRole.DATA_HOT_NODE_ROLE));
         assertThat(node.getRoles(), hasItem(DiscoveryNodeRole.DATA_WARM_NODE_ROLE));
@@ -110,7 +115,7 @@ public class DataTierTests extends ESTestCase {
 
     public void testDataRoleDoesNotImplyTieredDataRoles() {
         final Settings settings = Settings.builder().put(NodeRoleSettings.NODE_ROLES_SETTING.getKey(), "data").build();
-        final DiscoveryNode node = DiscoveryNode.createLocal(settings, buildNewFakeTransportAddress(), randomAlphaOfLength(8));
+        final DiscoveryNode node = DiscoveryNode.createLocal(settings, buildNewFakeTransportAddress(), randomAlphaOfLength(8), Map.of());
         assertThat(node.getRoles(), not(hasItem(DiscoveryNodeRole.DATA_CONTENT_NODE_ROLE)));
         assertThat(node.getRoles(), not(hasItem(DiscoveryNodeRole.DATA_HOT_NODE_ROLE)));
         assertThat(node.getRoles(), not(hasItem(DiscoveryNodeRole.DATA_WARM_NODE_ROLE)));

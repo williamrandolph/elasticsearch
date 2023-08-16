@@ -165,14 +165,16 @@ public class AllocationRoutedStepTests extends AbstractStepTestCase<AllocationRo
                         DiscoveryNode.createLocal(
                             nodeSettingsBuilder.build(),
                             new TransportAddress(TransportAddress.META_ADDRESS, 9200),
-                            "node1"
+                            "node1",
+                            Map.of()
                         )
                     )
                     .add(
                         DiscoveryNode.createLocal(
                             nodeSettingsBuilder.build(),
                             new TransportAddress(TransportAddress.META_ADDRESS, 9201),
-                            "node2"
+                            "node2",
+                            Map.of()
                         )
                     )
             )
@@ -532,10 +534,20 @@ public class AllocationRoutedStepTests extends AbstractStepTestCase<AllocationRo
             .nodes(
                 DiscoveryNodes.builder()
                     .add(
-                        DiscoveryNode.createLocal(node1Settings.build(), new TransportAddress(TransportAddress.META_ADDRESS, 9200), "node1")
+                        DiscoveryNode.createLocal(
+                            node1Settings.build(),
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9200),
+                            "node1",
+                            Map.of()
+                        )
                     )
                     .add(
-                        DiscoveryNode.createLocal(node2Settings.build(), new TransportAddress(TransportAddress.META_ADDRESS, 9201), "node2")
+                        DiscoveryNode.createLocal(
+                            node2Settings.build(),
+                            new TransportAddress(TransportAddress.META_ADDRESS, 9201),
+                            "node2",
+                            Map.of()
+                        )
                     )
             )
             .routingTable(RoutingTable.builder().add(indexRoutingTable).build())
