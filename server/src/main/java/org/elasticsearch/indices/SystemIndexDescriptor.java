@@ -666,8 +666,10 @@ public class SystemIndexDescriptor implements IndexPatternMatcher, Comparable<Sy
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+            builder.startObject();
             builder.field("version", version);
             builder.field("hash", hash);
+            builder.endObject();
             return builder;
         }
 

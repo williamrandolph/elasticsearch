@@ -627,6 +627,8 @@ public class DiscoveryNode implements Writeable, ToXContentFragment {
         builder.field("version", versionInfo.nodeVersion());
         builder.field("min_index_version", versionInfo.minIndexVersion());
         builder.field("max_index_version", versionInfo.maxIndexVersion());
+        builder.field("system_index_mappings_versions");
+        builder.map(getSystemIndexMappingsVersionMap());
         builder.endObject();
         return builder;
     }
