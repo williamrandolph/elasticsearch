@@ -241,7 +241,7 @@ public class SyncPluginsAction {
                         throw new RuntimeException("Couldn't find a PluginInfo for [" + eachPluginId + "], which should be impossible");
                     });
 
-                if (info.getElasticsearchVersion().before(Version.CURRENT)) {
+                if (Version.fromString(info.getElasticsearchVersion()).before(Version.CURRENT)) {
                     this.terminal.println(
                         Terminal.Verbosity.VERBOSE,
                         String.format(

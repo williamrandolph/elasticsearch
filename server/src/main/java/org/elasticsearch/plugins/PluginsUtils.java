@@ -78,25 +78,26 @@ public class PluginsUtils {
      */
     public static void verifyCompatibility(PluginDescriptor info) {
         if (info.isStable()) {
-            if (info.getElasticsearchVersion().major != Version.CURRENT.major) {
+            // TODO[wrb]: do we keep the concept of a "major"?
+            if (info.getElasticsearchMajorVersion() != Version.CURRENT.major) {
                 throw new IllegalArgumentException(
                     "Stable Plugin ["
                         + info.getName()
                         + "] was built for Elasticsearch major version "
-                        + info.getElasticsearchVersion().major
+                        + info.getElasticsearchMajorVersion()
                         + " but version "
-                        + Version.CURRENT
+                        + Build.current().version()
                         + " is running"
                 );
             }
-            if (info.getElasticsearchVersion().after(Version.CURRENT)) {
+            if (Version.fromString(info.getElasticsearchVersion()).after(Version.CURRENT)) {
                 throw new IllegalArgumentException(
                     "Stable Plugin ["
                         + info.getName()
                         + "] was built for Elasticsearch version "
                         + info.getElasticsearchVersion()
                         + " but earlier version "
-                        + Version.CURRENT
+                        + Build.current().version()
                         + " is running"
                 );
             }

@@ -39,7 +39,20 @@ public class PluginsUtilsTests extends ESTestCase {
 
     PluginDescriptor newTestDescriptor(String name, List<String> deps) {
         String javaVersion = Runtime.version().toString();
-        return new PluginDescriptor(name, "desc", "1.0", Version.CURRENT, javaVersion, "MyPlugin", null, deps, false, false, false, false);
+        return new PluginDescriptor(
+            name,
+            "desc",
+            "1.0",
+            Version.CURRENT.toString(),
+            javaVersion,
+            "MyPlugin",
+            null,
+            deps,
+            false,
+            false,
+            false,
+            false
+        );
     }
 
     public void testExistingPluginMissingDescriptor() throws Exception {
@@ -434,7 +447,7 @@ public class PluginsUtilsTests extends ESTestCase {
             "my_plugin",
             "desc",
             "1.0",
-            id,
+            id.toString(),
             javaVersion,
             "FakePlugin",
             null,

@@ -10,6 +10,7 @@ package org.elasticsearch.plugins.cli;
 
 import joptsimple.OptionSet;
 
+import org.elasticsearch.Build;
 import org.elasticsearch.Version;
 import org.elasticsearch.cli.ProcessInfo;
 import org.elasticsearch.cli.Terminal;
@@ -61,7 +62,7 @@ class ListPluginsCommand extends EnvironmentAwareCommand {
         terminal.println(Terminal.Verbosity.SILENT, prefix + plugin.getFileName().toString());
         PluginDescriptor info = PluginDescriptor.readFromProperties(env.pluginsFile().resolve(plugin));
         terminal.println(Terminal.Verbosity.VERBOSE, info.toString(prefix));
-        if (info.getElasticsearchVersion().equals(Version.CURRENT) == false) {
+        if (info.getElasticsearchVersion().equals(Build.current().version()) == false) {
             terminal.errorPrintln(
                 "WARNING: plugin ["
                     + info.getName()

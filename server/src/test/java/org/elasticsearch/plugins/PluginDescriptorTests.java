@@ -8,6 +8,7 @@
 
 package org.elasticsearch.plugins;
 
+import org.elasticsearch.Build;
 import org.elasticsearch.Version;
 import org.elasticsearch.action.admin.cluster.node.info.PluginsAndModules;
 import org.elasticsearch.common.io.stream.ByteBufferStreamInput;
@@ -227,7 +228,7 @@ public class PluginDescriptorTests extends ESTestCase {
             "c",
             "foo",
             "dummy",
-            Version.CURRENT,
+            Build.current().version(),
             "1.8",
             "dummyclass",
             null,
@@ -250,7 +251,7 @@ public class PluginDescriptorTests extends ESTestCase {
             "c",
             "foo",
             "dummy",
-            Version.CURRENT,
+            Build.current().version(),
             "1.8",
             "dummyclass",
             "some.module",
@@ -273,7 +274,7 @@ public class PluginDescriptorTests extends ESTestCase {
             name,
             "foo",
             "dummy",
-            Version.CURRENT,
+            Build.current().version(),
             "1.8",
             "dummyclass",
             null,
@@ -315,7 +316,7 @@ public class PluginDescriptorTests extends ESTestCase {
             "c",
             "foo",
             "dummy",
-            Version.CURRENT,
+            Build.current().version(),
             "1.8",
             "dummyclass",
             null,
@@ -330,7 +331,7 @@ public class PluginDescriptorTests extends ESTestCase {
             descriptor1.getName(),
             randomValueOtherThan(descriptor1.getDescription(), () -> randomAlphaOfLengthBetween(4, 12)),
             randomValueOtherThan(descriptor1.getVersion(), () -> randomAlphaOfLengthBetween(4, 12)),
-            descriptor1.getElasticsearchVersion().previousMajor(),
+            Version.fromString(descriptor1.getElasticsearchVersion()).previousMajor().toString(),
             randomValueOtherThan(descriptor1.getJavaVersion(), () -> randomAlphaOfLengthBetween(4, 12)),
             randomValueOtherThan(descriptor1.getClassname(), () -> randomAlphaOfLengthBetween(4, 12)),
             randomAlphaOfLength(6),
