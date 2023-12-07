@@ -194,5 +194,7 @@
             value="Do not negate boolean expressions with '!', but check explicitly with '== false' as it is more explicit"/>
     </module>
 
+    <module name="NeedBraces" />
+
   </module>
 </module>
