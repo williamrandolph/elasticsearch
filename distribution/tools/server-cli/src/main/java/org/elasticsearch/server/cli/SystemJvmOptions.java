@@ -31,7 +31,7 @@ final class SystemJvmOptions {
              */
             "-Des.networkaddress.cache.negative.ttl=10",
             // Allow to set the security manager.
-            "-Djava.security.manager=allow",
+            // "-Djava.security.manager=allow",
             // pre-touch JVM emory pages during initialization
             "-XX:+AlwaysPreTouch",
             // explicitly set the stack size
